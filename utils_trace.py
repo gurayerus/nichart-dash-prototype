@@ -5,22 +5,35 @@ import plotly.plotly as py
 import plotly.graph_objs as go
 from sklearn.linear_model import LinearRegression
 from plotly import tools
+import numpy as np
 
 ####### STUDIES TRACES ######
 
 def dots_trace(df, xvar, yvar):
     trace = go.Scatter(
-        #x=df['Age_At_Visit'], y=df['MUSE_GM'], showlegend=False, name="line"
-        x=df['Age_At_Visit'], y=df['MUSE_GM'], showlegend=False, mode = 'markers', name = "line"
+        x=df[xvar], y=df[yvar], showlegend=False, mode = 'markers', name = "line"
     )
+    
+    print('HHHHHHHHHHHHHHHHH')
     return trace
 
-def linregline_trace(df):
+#def dots_trace(df):
+    #xvar = 'Age_At_Visit'
+    #yvar = 'MUSE_GM'
+    #trace = go.Scatter(
+        #x=df[xvar], y=df[yvar], showlegend=False, mode = 'markers', name = "line"
+    #)
+    #return trace
+
+def linreg_trace(df, xvar, yvar, fig):
+    model = LinearRegression().fit(np.array(df[xvar]).reshape(-1,1), 
+                                   (np.array(df[yvar])))
+    y_hat = model.predict(np.array(df[xvar]).reshape(-1,1))
     trace = go.Scatter(
-        #x=df['Age_At_Visit'], y=df['MUSE_GM'], showlegend=False, name="line"
-        x=df['Age_At_Visit'], y=df['MUSE_GM'], showlegend=False, mode = 'markers', name = "line"
+        x=df[xvar], y=y_hat, showlegend=False, mode = 'lines', name = "linregfit"
     )
-    return trace
+    fig.append_trace(trace, 1, 1)  # plot in first row
+    return fig
 
 
 # UNUSED ---------------------

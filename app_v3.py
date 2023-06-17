@@ -33,25 +33,6 @@ server = app.server
 PATH = pathlib.Path(__file__).parent
 DATA_PATH = PATH.joinpath("data").resolve()
 
-# Loading historical tick data
-dset_data = {
-    "EURUSD": pd.read_csv(
-        DATA_PATH.joinpath("EURUSD.csv.gz"), index_col=1, parse_dates=["Date"]
-    ),
-    "USDJPY": pd.read_csv(
-        DATA_PATH.joinpath("USDJPY.csv.gz"), index_col=1, parse_dates=["Date"]
-    ),
-    "GBPUSD": pd.read_csv(
-        DATA_PATH.joinpath("GBPUSD.csv.gz"), index_col=1, parse_dates=["Date"]
-    ),
-    "USDCHF": pd.read_csv(
-        DATA_PATH.joinpath("USDCHF.csv.gz"), index_col=1, parse_dates=["Date"]
-    ),
-}
-
-# Currency dsets
-currencies = ["EURUSD", "USDCHF", "USDJPY", "GBPUSD"]
-
 # Loading roi data
 dsets_data = {
     "Dset1": pd.read_csv(DATA_PATH.joinpath("Dset1_n100.csv"), index_col=1),
@@ -184,13 +165,21 @@ def get_modal_fig(dset, index):
 
 
 # Returns graph figure
-def get_fig(dset, type_trace):
+def get_fig(dset, type_trace, type_plotlayer):
     # Get data
     df = dsets_data[dset]
 
-    selected_subplots_studies = []
-    selected_first_row_studies = []
-    row = 1  # number of subplots
+    print('WWWWWWWWWWWWWWWWWWWW')
+    print(type_trace)
+    print(type_plotlayer)
+
+    sel_plot_layers = []
+    row = 1
+
+    if len(type_plotlayer) > 0:
+        for sel_layer in type_plotlayer:
+            sel_plot_layers.append(sel_layer)
+
 
     fig = tools.make_subplots(
         rows=row,
@@ -201,8 +190,18 @@ def get_fig(dset, type_trace):
         vertical_spacing=0.12,
     )
 
+    ## FIXME   hard coded x y for now
+    xvar = 'Age_At_Visit'
+    yvar = 'MUSE_GM'
+
     # Add main trace (style) to figure
-    fig.append_trace(eval(type_trace)(df), 1, 1)
+    print('aaaaaaaaaaaaaaaaaaaaaaaaaaHHHHHHHHHHHHHHHHH')
+    fig.append_trace(eval(type_trace)(df, xvar, yvar), 1, 1)
+
+    # Add layers 
+    for sel_layer in sel_plot_layers:
+        fig = eval(sel_layer)(df, xvar, yvar, fig)
+
 
     fig["layout"][
         "uirevision"
@@ -236,7 +235,7 @@ def chart_div(dset):
                     # stores current menu tab
                     html.Div(
                         id=dset + "menu_tab",
-                        children=["Studies"],
+                        children=["PlotLayers"],
                         style={"display": "none"},
                     ),
                     html.Span(
@@ -246,38 +245,22 @@ def chart_div(dset):
                         n_clicks_timestamp=2,
                     ),
                     html.Span(
-                        "Studies",
-                        id=dset + "studies_header",
+                        "PlotLayers",
+                        id=dset + "plot_layers_header",
                         className="span-menu",
                         n_clicks_timestamp=1,
                     ),
-                    # Studies Checklist
+                    # PlotLayers Checklist
                     html.Div(
-                        id=dset + "studies_tab",
+                        id=dset + "plot_layers_tab",
                         children=[
                             dcc.Checklist(
-                                id=dset + "studies",
+                                id=dset + "plot_layers",
                                 options=[
-                                    {
-                                        "label": "Accumulation/D",
-                                        "value": "accumulation_trace",
-                                    },
-                                    {
-                                        "label": "Bollinger bands",
-                                        "value": "bollinger_trace",
-                                    },
-                                    {"label": "MA", "value": "moving_average_trace"},
-                                    {"label": "EMA", "value": "e_moving_average_trace"},
-                                    {"label": "CCI", "value": "cci_trace"},
-                                    {"label": "ROC", "value": "roc_trace"},
-                                    {"label": "Pivot points", "value": "pp_trace"},
+                                    {"label": "Lin Reg", "value": "linreg_trace"},
                                     {
                                         "label": "Stochastic oscillator",
                                         "value": "stoc_trace",
-                                    },
-                                    {
-                                        "label": "Momentum indicator",
-                                        "value": "mom_trace",
                                     },
                                 ],
                                 value=[],
@@ -296,8 +279,8 @@ def chart_div(dset):
                                         "label": "candlestick",
                                         "value": "candlestick_trace",
                                     },
-                                    {"label": "line", "value": "dots_trace"},
-                                    {"label": "mountain", "value": "area_trace"},
+                                    {"label": "dots", "value": "dots_trace"},
+                                    {"label": "linreg", "value": "linreg_trace"},
                                     {"label": "bar", "value": "bar_trace"},
                                     {
                                         "label": "colored bar",
@@ -582,15 +565,9 @@ app.layout = html.Div(
     ],
 )
 
-# Dynamic Callbacks
-
-# Replace currency dset row
-def generate_ask_bid_row_callback(dset):
-    def output_callback(n, i, bid, ask):
-        return replace_row(dset, int(i), float(bid), float(ask))
-
-    return output_callback
-
+## -------------------------------------------------------------
+# Dynamic Callbacks FIXME
+## -------------------------------------------------------------
 
 # returns string containing clicked charts
 def generate_chart_button_callback():
@@ -603,31 +580,32 @@ def generate_chart_button_callback():
                     str_dset = str_dset + "," + dset
                 else:
                     str_dset = dset
-
-        print('AAAAAAAAAAAAAAAAAAa')
-        print(str_dset)
-
         return str_dset
-
 
     return chart_button_callback
 
 
 # Function to update Graph Figure
 def generate_figure_callback(dset):
-    def chart_fig_callback(t, dsets, old_fig):
+    def chart_fig_callback(dsets, t, p, old_fig):
+
+
+        print('OOOO')
+        print(t)
+        print(p)
+        
 
         if dsets is None:
             return {"layout": {}, "data": {}}
 
-        #dsets = dsets.split(",")
-        #if dset not in dsets:
-            #return {"layout": {}, "data": []}
+        dsets = dsets.split(",")
+        if dset not in dsets:
+            return {"layout": {}, "data": []}
 
-        #if old_fig is None or old_fig == {"layout": {}, "data": {}}:
-            #return get_fig(dset, a, b, t, s, p)
+        if old_fig is None or old_fig == {"layout": {}, "data": {}}:
+            return get_fig(dset, t, p)
 
-        fig = get_fig(dset, t)
+        fig = get_fig(dset, t, p)
         return fig
 
     return chart_fig_callback
@@ -659,24 +637,28 @@ def generate_open_close_menu_callback():
 
 
 # Function for hidden div that stores the last clicked menu tab
-# Also updates style and studies menu headers
+# Also updates style and plot_layers menu headers
 def generate_active_menu_tab_callback():
-    def update_current_tab_name(n_style, n_studies):
-        if n_style >= n_studies:
+    def update_current_tab_name(n_style, n_plot_layers):
+        if n_style >= n_plot_layers:
             return "Style", "span-menu selected", "span-menu"
-        return "Studies", "span-menu", "span-menu selected"
+        return "PlotLayers", "span-menu", "span-menu selected"
 
     return update_current_tab_name
 
 
-# Function show or hide studies menu for chart
-def generate_studies_content_tab_callback():
-    def studies_tab(current_tab):
-        if current_tab == "Studies":
+# Function show or hide plot_layers menu for chart
+def generate_plot_layers_content_tab_callback():
+    def plot_layers_tab(current_tab):
+        
+
+        #print('AAAAAAABBBBBBBB')
+        #print(current_tab)        
+        if current_tab == "PlotLayers":
             return {"display": "block", "textAlign": "left", "marginTop": "30"}
         return {"display": "none"}
 
-    return studies_tab
+    return plot_layers_tab
 
 
 # Function show or hide style menu for chart
@@ -859,10 +841,6 @@ def generate_update_orders_div_callback():
 def generate_show_hide_graph_div_callback(dset):
     def show_graph_div_callback(dsets_clicked):
         
-        print('AAAAA')
-        print(dset)
-        print(dsets_clicked)
-        
         if dset not in dsets_clicked:
             return "display-none"
 
@@ -911,24 +889,14 @@ for dset in dsets:
     app.callback(
         Output(dset + "chart", "figure"),
         [
-            Input(dset + "chart_type", "value"),
             Input("dsets_clicked", "children"),
+            Input(dset + "chart_type", "value"),
+            Input(dset + "plot_layers", "value"),            
         ],
         [
             State(dset + "chart", "figure"),
         ],
     )(generate_figure_callback(dset))
-
-    ## updates the ask and bid prices
-    #app.callback(
-        #Output(dset + "row", "children"),
-        #[Input("i_bis", "n_intervals")],
-        #[
-            #State(dset + "index", "children"),
-            #State(dset + "bid", "children"),
-            #State(dset + "ask", "children"),
-        #],
-    #)(generate_ask_bid_row_callback(dset))
 
     ## close graph by setting to 0 n_clicks property
     #app.callback(
@@ -944,59 +912,33 @@ for dset in dsets:
         [State(dset + "menu", "className")],
     )(generate_open_close_menu_callback())
 
-    ## stores in hidden div name of clicked tab name
-    #app.callback(
-        #[
-            #Output(dset + "menu_tab", "children"),
-            #Output(dset + "style_header", "className"),
-            #Output(dset + "studies_header", "className"),
-        #],
-        #[
-            #Input(dset + "style_header", "n_clicks_timestamp"),
-            #Input(dset + "studies_header", "n_clicks_timestamp"),
-        #],
-    #)(generate_active_menu_tab_callback())
+    # stores in hidden div name of clicked tab name
+    app.callback(
+        [
+            Output(dset + "menu_tab", "children"),
+            Output(dset + "style_header", "className"),
+            Output(dset + "plot_layers_header", "className"),
+        ],
+        [
+            Input(dset + "style_header", "n_clicks_timestamp"),
+            Input(dset + "plot_layers_header", "n_clicks_timestamp"),
+        ],
+    )(generate_active_menu_tab_callback())
 
     ## hide/show STYLE tab content if clicked or not
     #app.callback(
         #Output(dset + "style_tab", "style"), [Input(dset + "menu_tab", "children")]
     #)(generate_style_content_tab_callback())
 
-    ## hide/show MENU tab content if clicked or not
-    #app.callback(
-        #Output(dset + "studies_tab", "style"), [Input(dset + "menu_tab", "children")]
-    #)(generate_studies_content_tab_callback())
+    # hide/show MENU tab content if clicked or not
+    app.callback(
+        Output(dset + "plot_layers_tab", "style"), [Input(dset + "menu_tab", "children")]
+    )(generate_plot_layers_content_tab_callback())
 
     ## show modal
     #app.callback(Output(dset + "modal", "style"), [Input(dset + "Buy", "n_clicks")])(
         #generate_modal_open_callback()
     #)
-
-    ## set modal value SL to O
-    #app.callback(Output(dset + "SL", "value"), [Input(dset + "Buy", "n_clicks")])(
-        #generate_clean_sl_callback()
-    #)
-
-    ## set modal value TP to O
-    #app.callback(Output(dset + "TP", "value"), [Input(dset + "Buy", "n_clicks")])(
-        #generate_clean_tp_callback()
-    #)
-
-    ## hide modal
-    #app.callback(
-        #Output(dset + "Buy", "n_clicks"),
-        #[
-            #Input(dset + "closeModal", "n_clicks"),
-            #Input(dset + "button_order", "n_clicks"),
-        #],
-    #)(generate_modal_close_callback())
-
-    ## updates modal figure
-    #app.callback(
-        #Output(dset + "modal_graph", "figure"),
-        #[Input(dset + "index", "children"), Input(dset + "Buy", "n_clicks")],
-        #[State(dset + "modal_graph", "figure")],
-    #)(generate_modal_figure_callback(dset))
 
     ## each dset saves its orders in hidden div
     #app.callback(
