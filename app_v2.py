@@ -29,7 +29,7 @@ PATH = pathlib.Path(__file__).parent
 DATA_PATH = PATH.joinpath("data").resolve()
 
 # Loading historical tick data
-currency_dset_data = {
+dset_data = {
     "EURUSD": pd.read_csv(
         DATA_PATH.joinpath("EURUSD.csv.gz"), index_col=1, parse_dates=["Date"]
     ),
@@ -131,9 +131,12 @@ def get_row(data):
                         className="button-chart",
                         children=[
                             html.Button(
-                                id = dset + "btnChart",
+                                id = dset + "Button_chart",
                                 children="Chart",
-                                n_clicks=0,
+                                n_clicks=1
+                                if dset in ["Dset1", "Dset2"]
+                                else 0,
+                                
                             )
                         ],
                     ),
@@ -141,64 +144,6 @@ def get_row(data):
             ),
         ]
     )
-
-
-# color of Bid & Ask rates
-def get_color(a, b):
-    if a == b:
-        return "white"
-    elif a > b:
-        return "#45df7e"
-    else:
-        return "#da5657"
-
-
-# Replace ask_bid row for currency dset with colored values
-def replace_row(currency_dset, index, bid, ask):
-    index = index + 1  # index of new data row
-    new_row = (
-        currency_dset_data[currency_dset].iloc[index]
-        if index != len(currency_dset_data[currency_dset])
-        else first_ask_bid(currency_dset, datetime.datetime.now())
-    )  # if not the end of the dataset we retrieve next dataset row
-
-    return [
-        html.P(
-            currency_dset, id=currency_dset, className="three-col"  # currency dset name
-        ),
-        html.P(
-            new_row[1].round(5),  # Bid value
-            id=new_row[0] + "bid",
-            className="three-col",
-            style={"color": get_color(new_row[1], bid)},
-        ),
-        html.P(
-            new_row[2].round(5),  # Ask value
-            className="three-col",
-            id=new_row[0] + "ask",
-            style={"color": get_color(new_row[2], ask)},
-        ),
-        html.Div(
-            index, id=currency_dset + "index", style={"display": "none"}
-        ),  # save index in hidden div
-    ]
-
-
-# Display big numbers in readable format
-def human_format(num):
-    try:
-        num = float(num)
-        # If value is 0
-        if num == 0:
-            return 0
-        # Else value is a number
-        if num < 1000000:
-            return num
-        magnitude = int(math.log(num, 1000))
-        mantissa = str(int(num / (1000 ** magnitude)))
-        return mantissa + ["", "K", "M", "G", "T", "P"][magnitude]
-    except:
-        return num
 
 
 # Returns Top cell bar for header area
@@ -211,20 +156,6 @@ def get_top_bar_cell(cellTitle, cellValue):
             html.P(children=human_format(cellValue)),
         ],
     )
-
-
-# Returns HTML Top Bar for app layout
-def get_top_bar(
-    balance=50000, equity=50000, margin=0, fm=50000, m_level="%", open_pl=0
-):
-    return [
-        get_top_bar_cell("Balance", balance),
-        get_top_bar_cell("Equity", equity),
-        get_top_bar_cell("Margin", margin),
-        get_top_bar_cell("Free Margin", fm),
-        get_top_bar_cell("Margin Level", m_level),
-        get_top_bar_cell("Open P/L", open_pl),
-    ]
 
 
 ####### STUDIES TRACES ######
@@ -350,7 +281,7 @@ def pp_trace(df, fig):
 # MAIN CHART TRACES (STYLE tab)
 def line_trace(df):
     trace = go.Scatter(
-        x=df.index, y=df["close"], mode="lines", showlegend=False, name="line"
+        x=df['Age_At_Visit'], y=df['MUSE_GM'], showlegend=False, name="line"
     )
     return trace
 
@@ -403,25 +334,25 @@ def candlestick_trace(df):
 
 
 # For buy/sell modal
-def ask_modal_trace(currency_dset, index):
-    df = currency_dset_data[currency_dset].iloc[index - 10 : index]  # returns ten rows
+def ask_modal_trace(dset, index):
+    df = dset_data[dset].iloc[index - 10 : index]  # returns ten rows
     return go.Scatter(x=df.index, y=df["Ask"], mode="lines", showlegend=False)
 
 
 # For buy/sell modal
-def bid_modal_trace(currency_dset, index):
-    df = currency_dset_data[currency_dset].iloc[index - 10 : index]  # returns ten rows
+def bid_modal_trace(dset, index):
+    df = dset_data[dset].iloc[index - 10 : index]  # returns ten rows
     return go.Scatter(x=df.index, y=df["Bid"], mode="lines", showlegend=False)
 
 
 # returns modal figure for a currency dset
-def get_modal_fig(currency_dset, index):
+def get_modal_fig(dset, index):
     fig = tools.make_subplots(
         rows=2, shared_xaxes=True, shared_yaxes=False, cols=1, print_grid=False
     )
 
-    fig.append_trace(ask_modal_trace(currency_dset, index), 1, 1)
-    fig.append_trace(bid_modal_trace(currency_dset, index), 2, 1)
+    fig.append_trace(ask_modal_trace(dset, index), 1, 1)
+    fig.append_trace(bid_modal_trace(dset, index), 2, 1)
 
     fig["layout"]["autosize"] = True
     fig["layout"]["height"] = 375
@@ -435,36 +366,13 @@ def get_modal_fig(currency_dset, index):
 
 
 # Returns graph figure
-def get_fig(currency_dset, ask, bid, type_trace, studies, period):
-    # Get OHLC data
-    data_frame = currency_dset_data[currency_dset]
-    t = datetime.datetime.now()
-    data = data_frame.loc[
-        : t.strftime(
-            "2016-01-05 %H:%M:%S"
-        )  # all the data from the beginning until current time
-    ]
-    data_bid = data["Bid"]
-    df = data_bid.resample(period).ohlc()
+def get_fig(dset, type_trace):
+    # Get data
+    df = dsets_data[dset]
 
-    subplot_traces = [  # first row traces
-        "accumulation_trace",
-        "cci_trace",
-        "roc_trace",
-        "stoc_trace",
-        "mom_trace",
-    ]
     selected_subplots_studies = []
     selected_first_row_studies = []
     row = 1  # number of subplots
-
-    if studies:
-        for study in studies:
-            if study in subplot_traces:
-                row += 1  # increment number of rows only if the study needs a subplot
-                selected_subplots_studies.append(study)
-            else:
-                selected_first_row_studies.append(study)
 
     fig = tools.make_subplots(
         rows=row,
@@ -477,16 +385,6 @@ def get_fig(currency_dset, ask, bid, type_trace, studies, period):
 
     # Add main trace (style) to figure
     fig.append_trace(eval(type_trace)(df), 1, 1)
-
-    # Add trace(s) on fig's first row
-    for study in selected_first_row_studies:
-        fig = eval(study)(df, fig)
-
-    row = 1
-    # Plot trace on new row
-    for study in selected_subplots_studies:
-        row += 1
-        fig.append_trace(eval(study)(df), row, 1)
 
     fig["layout"][
         "uirevision"
@@ -514,8 +412,8 @@ def chart_div(dset):
             # Menu for Chart
             html.Div(
                 id=dset + "menu",
-                className="not_visible",
-                #className="visible",
+                #className="not_visible",
+                className="visible",
                 children=[
                     # stores current menu tab
                     html.Div(
@@ -588,7 +486,7 @@ def chart_div(dset):
                                         "value": "colored_bar_trace",
                                     },
                                 ],
-                                value="colored_bar_trace",
+                                value="line_trace",
                             )
                         ],
                     ),
@@ -851,18 +749,18 @@ app.layout = html.Div(
                 #),
             ],
         ),
-        # Hidden div that stores all clicked charts (EURUSD, USDCHF, etc.)
-        html.Div(id="charts_clicked", style={"display": "none"}),
-        # Hidden div for each dset that stores orders
-        html.Div(
-            children=[
-                html.Div(id=dset + "orders", style={"display": "none"})
-                for dset in currencies
-            ]
-        ),
-        html.Div([modal(dset) for dset in currencies]),
-        # Hidden Div that stores all orders
-        html.Div(id="orders", style={"display": "none"}),
+        # Hidden div that stores all clicked dsets
+        html.Div(id="dsets_clicked"),
+        ## Hidden div for each dset that stores orders
+        #html.Div(
+            #children=[
+                #html.Div(id=dset + "orders", style={"display": "none"})
+                #for dset in currencies
+            #]
+        #),
+        #html.Div([modal(dset) for dset in currencies]),
+        ## Hidden Div that stores all orders
+        #html.Div(id="orders", style={"display": "none"}),
     ],
 )
 
@@ -879,34 +777,39 @@ def generate_ask_bid_row_callback(dset):
 # returns string containing clicked charts
 def generate_chart_button_callback():
     def chart_button_callback(*args):
-        dsets = ""
-        for i in range(len(currencies)):
+        str_dset = ""
+        for i in range(len(dsets)):
             if args[i] > 0:
-                dset = currencies[i]
-                if dsets:
-                    dsets = dsets + "," + dset
+                dset = dsets[i]
+                if str_dset:
+                    str_dset = str_dset + "," + dset
                 else:
-                    dsets = dset
-        return dsets
+                    str_dset = dset
+
+        print('AAAAAAAAAAAAAAAAAAa')
+        print(str_dset)
+
+        return str_dset
+
 
     return chart_button_callback
 
 
 # Function to update Graph Figure
 def generate_figure_callback(dset):
-    def chart_fig_callback(n_i, p, t, s, dsets, a, b, old_fig):
+    def chart_fig_callback(t, dsets, old_fig):
 
         if dsets is None:
             return {"layout": {}, "data": {}}
 
-        dsets = dsets.split(",")
-        if dset not in dsets:
-            return {"layout": {}, "data": []}
+        #dsets = dsets.split(",")
+        #if dset not in dsets:
+            #return {"layout": {}, "data": []}
 
-        if old_fig is None or old_fig == {"layout": {}, "data": {}}:
-            return get_fig(dset, a, b, t, s, p)
+        #if old_fig is None or old_fig == {"layout": {}, "data": {}}:
+            #return get_fig(dset, a, b, t, s, p)
 
-        fig = get_fig(dset, a, b, t, s, p)
+        fig = get_fig(dset, t)
         return fig
 
     return chart_fig_callback
@@ -1136,12 +1039,17 @@ def generate_update_orders_div_callback():
 
 # Resize dset div according to the number of charts displayed
 def generate_show_hide_graph_div_callback(dset):
-    def show_graph_div_callback(charts_clicked):
-        if dset not in charts_clicked:
+    def show_graph_div_callback(dsets_clicked):
+        
+        print('AAAAA')
+        print(dset)
+        print(dsets_clicked)
+        
+        if dset not in dsets_clicked:
             return "display-none"
 
-        charts_clicked = charts_clicked.split(",")  # [:4] max of 4 graph
-        len_list = len(charts_clicked)
+        dsets_clicked = dsets_clicked.split(",")  # [:4] max of 4 graph
+        len_list = len(dsets_clicked)
 
         classes = "chart-style"
         if len_list % 2 == 0:
@@ -1167,7 +1075,7 @@ def generate_contents_for_left_panel():
     return show_contents
 
 
-# Loop through all currencies
+# Loop through all dsets
 for dset in dsets:
 
     # Callback for Buy/Sell and Chart Buttons for Left Panel
@@ -1176,27 +1084,22 @@ for dset in dsets:
         [Input(dset + "summary", "n_clicks")],
     )(generate_contents_for_left_panel())
 
-    ## Callback for className of div for graphs
-    #app.callback(
-        #Output(dset + "graph_div", "className"), [Input("charts_clicked", "children")]
-    #)(generate_show_hide_graph_div_callback(dset))
+    # Callback for className of div for graphs
+    app.callback(
+        Output(dset + "graph_div", "className"), [Input("dsets_clicked", "children")]
+    )(generate_show_hide_graph_div_callback(dset))
 
-    ## Callback to update the actual graph
-    #app.callback(
-        #Output(dset + "chart", "figure"),
-        #[
-            #Input("i_tris", "n_intervals"),
-            #Input(dset + "dropdown_period", "value"),
-            #Input(dset + "chart_type", "value"),
-            #Input(dset + "studies", "value"),
-            #Input("charts_clicked", "children"),
-        #],
-        #[
-            #State(dset + "ask", "children"),
-            #State(dset + "bid", "children"),
-            #State(dset + "chart", "figure"),
-        #],
-    #)(generate_figure_callback(dset))
+    # Callback to update the actual graph
+    app.callback(
+        Output(dset + "chart", "figure"),
+        [
+            Input(dset + "chart_type", "value"),
+            Input("dsets_clicked", "children"),
+        ],
+        [
+            State(dset + "chart", "figure"),
+        ],
+    )(generate_figure_callback(dset))
 
     ## updates the ask and bid prices
     #app.callback(
@@ -1216,12 +1119,12 @@ for dset in dsets:
         #[State(dset + "Button_chart", "n_clicks")],
     #)(generate_close_graph_callback())
 
-    ## show or hide graph menu
-    #app.callback(
-        #Output(dset + "menu", "className"),
-        #[Input(dset + "menu_button", "n_clicks")],
-        #[State(dset + "menu", "className")],
-    #)(generate_open_close_menu_callback())
+    # show or hide graph menu
+    app.callback(
+        Output(dset + "menu", "className"),
+        [Input(dset + "menu_button", "n_clicks")],
+        [State(dset + "menu", "className")],
+    )(generate_open_close_menu_callback())
 
     ## stores in hidden div name of clicked tab name
     #app.callback(
@@ -1292,144 +1195,19 @@ for dset in dsets:
         #],
     #)(generate_order_button_callback(dset))
 
-## updates hidden div with all the clicked charts
-#app.callback(
-    #Output("charts_clicked", "children"),
-    #[Input(dset + "Button_chart", "n_clicks") for dset in currencies],
-    #[State("charts_clicked", "children")],
-#)(generate_chart_button_callback())
-
-## updates hidden orders div with all dsets orders
-#app.callback(
-    #Output("orders", "children"),
-    #[Input(dset + "orders", "children") for dset in currencies]
-    #+ [Input(dset + "bid", "children") for dset in currencies]
-    #+ [Input(dset + "ask", "children") for dset in currencies]
-    #+ [Input("closable_orders", "value")],
-    #[State("orders", "children")],
-#)(generate_update_orders_div_callback())
-
-## Callback to update Orders Table
-#@app.callback(
-    #Output("orders_table", "children"),
-    #[Input("orders", "children"), Input("dropdown_positions", "value")],
-#)
-#def update_order_table(orders, position):
-    #headers = [
-        #"Order Id",
-        #"Time",
-        #"Type",
-        #"Volume",
-        #"Symbol",
-        #"TP",
-        #"SL",
-        #"Price",
-        #"Profit",
-        #"Status",
-        #"Close Time",
-        #"Close Price",
-    #]
-
-    ## If there are no orders
-    #if orders is None or orders is "[]":
-        #return [
-            #html.Table(html.Tr(children=[html.Th(title) for title in headers])),
-            #html.Div(
-                #className="text-center table-orders-empty",
-                #children=[html.P("No " + position + " positions data row")],
-            #),
-        #]
-
-    #rows = []
-    #list_order = json.loads(orders)
-    #for order in list_order:
-        #tr_childs = []
-        #for attr in order:
-            #if str(order["status"]) == position:
-                #tr_childs.append(html.Td(order[attr]))
-        ## Color row based on profitability of order
-        #if float(order["profit"]) >= 0:
-            #rows.append(html.Tr(className="profit", children=tr_childs))
-        #else:
-            #rows.append(html.Tr(className="no-profit", children=tr_childs))
-
-    #return html.Table(children=[html.Tr([html.Th(title) for title in headers])] + rows)
+# updates hidden div with all the clicked dsets
+app.callback(
+    Output("dsets_clicked", "children"),
+    [Input(dset + "Button_chart", "n_clicks") for dset in dsets],
+    [State("dsets_clicked", "children")],
+)(generate_chart_button_callback())
 
 
-## Update Options in dropdown for Open and Close positions
-#@app.callback(Output("dropdown_positions", "options"), [Input("orders", "children")])
-#def update_positions_dropdown(orders):
-    #closeOrders = 0
-    #openOrders = 0
-    #if orders is not None:
-        #orders = json.loads(orders)
-        #for order in orders:
-            #if order["status"] == "closed":
-                #closeOrders += 1
-            #if order["status"] == "open":
-                #openOrders += 1
-    #return [
-        #{"label": "Open positions (" + str(openOrders) + ")", "value": "open"},
-        #{"label": "Closed positions (" + str(closeOrders) + ")", "value": "closed"},
-    #]
 
 
-## Callback to close orders from dropdown options
-#@app.callback(Output("closable_orders", "options"), [Input("orders", "children")])
-#def update_close_dropdown(orders):
-    #options = []
-    #if orders is not None:
-        #orders = json.loads(orders)
-        #for order in orders:
-            #if order["status"] == "open":
-                #options.append({"label": order["id"], "value": order["id"]})
-    #return options
 
 
-## Callback to update Top Bar values
-#@app.callback(Output("top_bar", "children"), [Input("orders", "children")])
-#def update_top_bar(orders):
-    #if orders is None or orders is "[]":
-        #return get_top_bar()
 
-    #orders = json.loads(orders)
-    #open_pl = 0
-    #balance = 50000
-    #free_margin = 50000                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
-    #margin = 0
-
-    #for order in orders:
-        #if order["status"] == "open":
-            #open_pl += float(order["profit"])
-            #conversion_price = (
-                #1 if order["symbol"][:3] == "USD" else float(order["price"])
-            #)
-            #margin += (float(order["volume"]) * 100000) / (200 * conversion_price)
-        #else:
-            #balance += float(order["profit"])
-
-    #equity = balance - open_pl
-    #free_margin = equity - margin
-    #margin_level = "%" if margin == 0 else "%2.F" % ((equity / margin) * 100) + "%"
-    #equity = "%.2F" % equity
-    #balance = "%.2F" % balance
-    #open_pl = "%.2F" % open_pl
-    #free_margin = "%.2F" % free_margin
-    #margin = "%2.F" % margin
-
-    #return get_top_bar(balance, equity, margin, free_margin, margin_level, open_pl)
-
-
-## Callback to update live clock
-#@app.callback(Output("live_clock", "children"), [Input("interval", "n_intervals")])
-#def update_time(n):
-    #return datetime.datetime.now().strftime("%H:%M:%S")
-
-
-## Callback to update news
-#@app.callback(Output("news", "children"), [Input("i_news", "n_intervals")])
-#def update_nothing_div(n):
-    #return update_nothing()
 
 
 if __name__ == "__main__":

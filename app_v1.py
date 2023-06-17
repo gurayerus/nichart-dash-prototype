@@ -899,7 +899,7 @@ app.layout = html.Div(
             ],
         ),
         # Hidden div that stores all clicked charts (EURUSD, USDCHF, etc.)
-        html.Div(id="charts_clicked", style={"display": "none"}),
+        html.Div(id="charts_clicked"),
         # Hidden div for each pair that stores orders
         html.Div(
             children=[
