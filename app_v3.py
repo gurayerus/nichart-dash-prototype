@@ -18,6 +18,9 @@ from sklearn.linear_model import LinearRegression
 from dash.dependencies import Input, Output, State
 from plotly import tools
 
+from utils_trace import *
+#import utils_trace as uuu
+
 
 app = dash.Dash(
     __name__, meta_tags=[{"name": "viewport", "content": "width=device-width"}],
@@ -293,7 +296,7 @@ def chart_div(dset):
                                         "label": "candlestick",
                                         "value": "candlestick_trace",
                                     },
-                                    {"label": "line", "value": "line_trace"},
+                                    {"label": "line", "value": "dots_trace"},
                                     {"label": "mountain", "value": "area_trace"},
                                     {"label": "bar", "value": "bar_trace"},
                                     {
@@ -301,7 +304,7 @@ def chart_div(dset):
                                         "value": "colored_bar_trace",
                                     },
                                 ],
-                                value="line_trace",
+                                value="dots_trace",
                             )
                         ],
                     ),
