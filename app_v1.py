@@ -647,7 +647,7 @@ def chart_div(pair):
                                 children=[
                                     dcc.Dropdown(
                                         className="dropdown-period",
-                                        id=pair + "dropdown_period",
+                                        id = dset + "dropdown_period",
                                         options=[
                                             {"label": "5 min", "value": "5Min"},
                                             {"label": "15 min", "value": "15Min"},

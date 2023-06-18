@@ -600,6 +600,10 @@ div.Select-value, .Select-control,div.period, .Select-input{
   width: 100px;
 }
 
+.dropdown-roi{
+  width: 150px;
+}
+
 .chart-top-bar{
   background-color: #30333d;
   padding:12px;

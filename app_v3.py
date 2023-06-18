@@ -42,6 +42,8 @@ dsets_data = {
 # Currency dsets
 dsets = ["Dset1", "Dset2"]
 
+tmp_col = dsets_data['Dset1'].columns
+ROI_NAMES = tmp_col[tmp_col.str.contains('MUSE')].tolist()
 
 # API Call to update news
 def update_nothing():
@@ -165,13 +167,9 @@ def get_modal_fig(dset, index):
 
 
 # Returns graph figure
-def get_fig(dset, type_trace, type_plotlayer):
+def get_fig(dset, type_trace, type_plotlayer, roi):
     # Get data
     df = dsets_data[dset]
-
-    print('WWWWWWWWWWWWWWWWWWWW')
-    print(type_trace)
-    print(type_plotlayer)
 
     sel_plot_layers = []
     row = 1
@@ -193,9 +191,9 @@ def get_fig(dset, type_trace, type_plotlayer):
     ## FIXME   hard coded x y for now
     xvar = 'Age_At_Visit'
     yvar = 'MUSE_GM'
+    yvar = roi
 
     # Add main trace (style) to figure
-    print('aaaaaaaaaaaaaaaaaaaaaaaaaaHHHHHHHHHHHHHHHHH')
     fig.append_trace(eval(type_trace)(df, xvar, yvar), 1, 1)
 
     # Add layers 
@@ -275,17 +273,8 @@ def chart_div(dset):
                             dcc.RadioItems(
                                 id=dset + "chart_type",
                                 options=[
-                                    {
-                                        "label": "candlestick",
-                                        "value": "candlestick_trace",
-                                    },
                                     {"label": "dots", "value": "dots_trace"},
-                                    {"label": "linreg", "value": "linreg_trace"},
                                     {"label": "bar", "value": "bar_trace"},
-                                    {
-                                        "label": "colored bar",
-                                        "value": "colored_bar_trace",
-                                    },
                                 ],
                                 value="dots_trace",
                             )
@@ -311,14 +300,15 @@ def chart_div(dset):
                                 className="inline-block",
                                 children=[
                                     dcc.Dropdown(
-                                        className="dropdown-period",
-                                        id=dset + "dropdown_period",
+                                        className="dropdown-roi",
+                                        id=dset + "dropdown_roi",
                                         options=[
-                                            {"label": "5 min", "value": "5Min"},
-                                            {"label": "15 min", "value": "15Min"},
-                                            {"label": "30 min", "value": "30Min"},
+                                            {'label': i, 'value': i} for i in ROI_NAMES
                                         ],
-                                        value="15Min",
+                                        value = ROI_NAMES[0],
+                                        
+                                        
+                                        
                                         clearable=False,
                                     )
                                 ],
@@ -587,13 +577,13 @@ def generate_chart_button_callback():
 
 # Function to update Graph Figure
 def generate_figure_callback(dset):
-    def chart_fig_callback(dsets, t, p, old_fig):
+    def chart_fig_callback(dsets, t, p, r, old_fig):
 
 
         print('OOOO')
         print(t)
         print(p)
-        
+        print(r)
 
         if dsets is None:
             return {"layout": {}, "data": {}}
@@ -603,9 +593,9 @@ def generate_figure_callback(dset):
             return {"layout": {}, "data": []}
 
         if old_fig is None or old_fig == {"layout": {}, "data": {}}:
-            return get_fig(dset, t, p)
+            return get_fig(dset, t, p, r)
 
-        fig = get_fig(dset, t, p)
+        fig = get_fig(dset, t, p, r)
         return fig
 
     return chart_fig_callback
@@ -892,6 +882,7 @@ for dset in dsets:
             Input("dsets_clicked", "children"),
             Input(dset + "chart_type", "value"),
             Input(dset + "plot_layers", "value"),            
+            Input(dset + "dropdown_roi", "value"),
         ],
         [
             State(dset + "chart", "figure"),
