@@ -5,25 +5,16 @@ import plotly.plotly as py
 import plotly.graph_objs as go
 from sklearn.linear_model import LinearRegression
 from plotly import tools
+import statsmodels.api as sm
 import numpy as np
 
 ####### STUDIES TRACES ######
 
 def dots_trace(df, xvar, yvar):
     trace = go.Scatter(
-        x=df[xvar], y=df[yvar], showlegend=False, mode = 'markers', name = "line"
+        x=df[xvar], y=df[yvar], showlegend=False, mode = 'markers', name = "datapoint"
     )
-    
-    print('HHHHHHHHHHHHHHHHH')
     return trace
-
-#def dots_trace(df):
-    #xvar = 'Age_At_Visit'
-    #yvar = 'MUSE_GM'
-    #trace = go.Scatter(
-        #x=df[xvar], y=df[yvar], showlegend=False, mode = 'markers', name = "line"
-    #)
-    #return trace
 
 def linreg_trace(df, xvar, yvar, fig):
     model = LinearRegression().fit(np.array(df[xvar]).reshape(-1,1), 
@@ -35,6 +26,16 @@ def linreg_trace(df, xvar, yvar, fig):
     fig.append_trace(trace, 1, 1)  # plot in first row
     return fig
 
+def lowess_trace(df, xvar, yvar, fig):
+    lowess = sm.nonparametric.lowess
+
+    #y_hat = lowess(np.array(df[yvar], np.array(df[xvar], frac=1./3)
+    y_hat = lowess(df[yvar], df[xvar], frac=1./3)
+    trace = go.Scatter(
+        x = y_hat[:,0], y=y_hat[:,1], showlegend=False, mode = 'lines', name = "lowessfit"
+    )
+    fig.append_trace(trace, 1, 1)  # plot in first row
+    return fig
 
 # UNUSED ---------------------
 

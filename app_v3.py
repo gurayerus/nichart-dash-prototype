@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import io
+import os
 import json
 import base64
 import datetime
@@ -14,6 +16,7 @@ import plotly.plotly as py
 import plotly.graph_objs as go
 from sklearn.linear_model import LinearRegression
 
+import base64
 
 from dash.dependencies import Input, Output, State
 from plotly import tools
@@ -35,28 +38,40 @@ DATA_PATH = PATH.joinpath("data").resolve()
 
 # Loading roi data
 dsets_data = {
-    "Dset1": pd.read_csv(DATA_PATH.joinpath("Dset1_n100.csv"), index_col=1),
-    "Dset2": pd.read_csv(DATA_PATH.joinpath("Dset2_n100.csv"), index_col=1),
+    "Dset1": pd.read_csv(DATA_PATH.joinpath("Dset1_n100.csv"), index_col=1).to_dict(),
+    #"Dset2": pd.read_csv(DATA_PATH.joinpath("Dset2_n100.csv"), index_col=1),
 }
 
 # Currency dsets
-dsets = ["Dset1", "Dset2"]
+#dsets = ["Dset1", "Dset2"]
+dsets = ["Dset1"]
 
-tmp_col = dsets_data['Dset1'].columns
+tmp_col = pd.DataFrame.from_dict(dsets_data['Dset1']).columns
 ROI_NAMES = tmp_col[tmp_col.str.contains('MUSE')].tolist()
 
-# API Call to update news
+# API Call to update 
 def update_nothing():
     return 'HelloWorld'
 
 # Return GM WM mean values
-def roi_mean_gm(dset):
-    df = dsets_data[dset]
+def roi_mean_gm(dfs, df_name):
+    
+    #print('EEEEEEEEe')
+    #print(dfs.keys())
+    #print(df_name)
+    
+    df = dfs[df_name]
+    df = pd.DataFrame.from_dict(dfs[df_name])
+        
+    #print(df)
+    #print('FFFFFFFffEEEEEEEEe')
+    #input()
+    
     meanGM = df['MUSE_GM'].mean()
     meanWM = df['MUSE_WM'].mean()
-    return [dset, meanGM, meanWM]
+    return [df_name, meanGM, meanWM]
 
-# Creates HTML with ROIs
+# Creates left panel rows for uploaded files
 def get_row(data):
     dset = data[0]
     meanGM = data[1]
@@ -122,7 +137,8 @@ def get_row(data):
                                 id = dset + "Button_chart",
                                 children="Chart",
                                 n_clicks=1
-                                if dset in ["Dset1", "Dset2"]
+                                #if dset in ["Dset1", "Dset2"]
+                                if dset in []
                                 else 0,
                                 
                             )
@@ -256,10 +272,7 @@ def chart_div(dset):
                                 id=dset + "plot_layers",
                                 options=[
                                     {"label": "Lin Reg", "value": "linreg_trace"},
-                                    {
-                                        "label": "Stochastic oscillator",
-                                        "value": "stoc_trace",
-                                    },
+                                    {"label": "Lowess Reg", "value": "lowess_trace"},
                                 ],
                                 value=[],
                             )
@@ -334,104 +347,6 @@ def chart_div(dset):
         ],
     )
 
-
-# returns modal Buy/Sell
-def modal(dset):
-    return html.Div(
-        id=dset + "modal",
-        className="modal",
-        style={"display": "none"},
-        children=[
-            html.Div(
-                className="modal-content",
-                children=[
-                    html.Span(
-                        id=dset + "closeModal", className="modal-close", children="×"
-                    ),
-                    html.P(id="modal" + dset, children=dset),
-                    # row div with two div
-                    html.Div(
-                        className="row",
-                        children=[
-                            # graph div
-                            html.Div(
-                                className="six columns",
-                                children=[
-                                    dcc.Graph(
-                                        id=dset + "modal_graph",
-                                        config={"displayModeBar": False},
-                                    )
-                                ],
-                            ),
-                            # order values div
-                            html.Div(
-                                className="six columns modal-user-control",
-                                children=[
-                                    html.Div(
-                                        children=[
-                                            html.P("Volume"),
-                                            dcc.Input(
-                                                id=dset + "volume",
-                                                className="modal-input",
-                                                type="number",
-                                                value=0.1,
-                                                min=0,
-                                                step=0.1,
-                                            ),
-                                        ]
-                                    ),
-                                    html.Div(
-                                        children=[
-                                            html.P("Type"),
-                                            dcc.RadioItems(
-                                                id=dset + "trade_type",
-                                                options=[
-                                                    {"label": "Buy", "value": "buy"},
-                                                    {"label": "Sell", "value": "sell"},
-                                                ],
-                                                value="buy",
-                                                labelStyle={"display": "inline-block"},
-                                            ),
-                                        ]
-                                    ),
-                                    html.Div(
-                                        children=[
-                                            html.P("SL TPS"),
-                                            dcc.Input(
-                                                id=dset + "SL",
-                                                type="number",
-                                                min=0,
-                                                step=1,
-                                            ),
-                                        ]
-                                    ),
-                                    html.Div(
-                                        children=[
-                                            html.P("TP TPS"),
-                                            dcc.Input(
-                                                id=dset + "TP",
-                                                type="number",
-                                                min=0,
-                                                step=1,
-                                            ),
-                                        ]
-                                    ),
-                                ],
-                            ),
-                        ],
-                    ),
-                    html.Div(
-                        className="modal-order-btn",
-                        children=html.Button(
-                            "Order", id=dset + "button_order", n_clicks=0
-                        ),
-                    ),
-                ],
-            )
-        ],
-    )
-
-
 # Dash App Layout
 app.layout = html.Div(
     className="row",
@@ -439,8 +354,10 @@ app.layout = html.Div(
 
         # Left Panel Div
         html.Div(
+                        
             className="three columns div-left-panel",
             children=[
+                
                 # Div for Left Panel App Info
                 html.Div(
                     className="div-info",
@@ -460,9 +377,37 @@ app.layout = html.Div(
                         ),
                     ],
                 ),
-                # GM WM Div
+                        
+                html.Div([
+                    dcc.Upload(
+                        id='upload-data',
+                        children=html.Div([
+                            'Drag and Drop or ',
+                            html.A('Select Files')
+                        ]),
+                        style={
+                            'width': '100%',
+                            'height': '60px',
+                            'lineHeight': '60px',
+                            'borderWidth': '1px',
+                            'borderStyle': 'dashed',
+                            'borderRadius': '5px',
+                            'textAlign': 'center',
+                            'margin': '10px'
+                        },
+                        # Allow multiple files to be uploaded
+                        multiple=True
+                    ),
+                    dcc.Store(id='store'),
+                    html.H2("File List"),
+                    html.Ul(id="file-list"),                    
+                    html.Div(id='output-data-upload'),
+                ]),
+
+                        
+                # File View Div
                 html.Div(
-                    className="div-currency-toggles",
+                    className="div-df-toggles",
                     children=[
                         html.P(
                             id="live_clock",
@@ -472,10 +417,11 @@ app.layout = html.Div(
                         html.P(className="three-col", children="GM Volume"),
                         html.P(className="three-col", children="WM Volume"),
                         html.Div(
-                            id="dsets",
+                            id="uploaded_dfs",
                             className="div-gm-wm",
                             children=[
-                                get_row(roi_mean_gm(dset)) for dset in dsets
+                                get_row(roi_mean_gm(dsets_data, dset)) for dset in dsets
+                                #get_row(roi_mean_gm(dset)) for dset in []
                             ],
                         ),
                     ],
@@ -501,43 +447,6 @@ app.layout = html.Div(
                     className = "row",
                     children = [chart_div(dset) for dset in dsets],
                 ),
-                ## Panel for orders
-                #html.Div(
-                    #id="bottom_panel",
-                    #className="row div-bottom-panel",
-                    #children=[
-                        #html.Div(
-                            #className="display-inlineblock",
-                            #children=[
-                                #dcc.Dropdown(
-                                    #id="dropdown_positions",
-                                    #className="bottom-dropdown",
-                                    #options=[
-                                        #{"label": "Open Positions", "value": "open"},
-                                        #{
-                                            #"label": "Closed Positions",
-                                            #"value": "closed",
-                                        #},
-                                    #],
-                                    #value="open",
-                                    #clearable=False,
-                                    #style={"border": "0px solid black"},
-                                #)
-                            #],
-                        #),
-                        #html.Div(
-                            #className="display-inlineblock float-right",
-                            #children=[
-                                #dcc.Dropdown(
-                                    #id="closable_orders",
-                                    #className="bottom-dropdown",
-                                    #placeholder="Close order",
-                                #)
-                            #],
-                        #),
-                        #html.Div(id="orders_table", className="row table-orders"),
-                    #],
-                #),
             ],
         ),
         # Hidden div that stores all clicked dsets
@@ -640,10 +549,6 @@ def generate_active_menu_tab_callback():
 # Function show or hide plot_layers menu for chart
 def generate_plot_layers_content_tab_callback():
     def plot_layers_tab(current_tab):
-        
-
-        #print('AAAAAAABBBBBBBB')
-        #print(current_tab)        
         if current_tab == "PlotLayers":
             return {"display": "block", "textAlign": "left", "marginTop": "30"}
         return {"display": "none"}
@@ -864,7 +769,7 @@ def generate_contents_for_left_panel():
 # Loop through all dsets
 for dset in dsets:
 
-    # Callback for Buy/Sell and Chart Buttons for Left Panel
+    # Callback for Left Panel
     app.callback(
         [Output(dset + "contents", "className"), Output(dset + "summary", "className")],
         [Input(dset + "summary", "n_clicks")],
@@ -926,25 +831,6 @@ for dset in dsets:
         Output(dset + "plot_layers_tab", "style"), [Input(dset + "menu_tab", "children")]
     )(generate_plot_layers_content_tab_callback())
 
-    ## show modal
-    #app.callback(Output(dset + "modal", "style"), [Input(dset + "Buy", "n_clicks")])(
-        #generate_modal_open_callback()
-    #)
-
-    ## each dset saves its orders in hidden div
-    #app.callback(
-        #Output(dset + "orders", "children"),
-        #[Input(dset + "button_order", "n_clicks")],
-        #[
-            #State(dset + "volume", "value"),
-            #State(dset + "trade_type", "value"),
-            #State(dset + "SL", "value"),
-            #State(dset + "TP", "value"),
-            #State(dset + "orders", "children"),
-            #State(dset + "ask", "children"),
-            #State(dset + "bid", "children"),
-        #],
-    #)(generate_order_button_callback(dset))
 
 # updates hidden div with all the clicked dsets
 app.callback(
@@ -955,10 +841,90 @@ app.callback(
 
 
 
+def parse_contents(contents, filename):
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    try:
+        if 'csv' in filename:
+            # Assume that the user uploaded a CSV file
+            df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+            
+    except Exception as e:
+        return None
+
+    df = df.to_dict(orient='records')
+    return df
+
+def generate_upload_data_callback():
+    def upload_data_callback(list_of_names, list_of_contents, store_data):
+        
+        ## Initialize empty dictionary for the storage
+        if store_data is None:
+            store_data = {}
+        
+        ## Read data files
+        dfs = []
+        if list_of_contents is not None:
+            dfs = [
+                parse_contents(c, n) for c, n in zip(list_of_contents, list_of_names)]
+
+        ## Add dfs to storage
+        for i, tmp_df in enumerate(dfs):
+            if tmp_df is not None:                
+                tmp_name = list_of_names[i]
+                
+                print('BBB')
+                print(len(tmp_name))
+                #input()
+                
+                if tmp_name in store_data.keys():
+                    print('File already in storage, skipping !')
+                else:
+                    store_data[tmp_name] = tmp_df
+
+        if store_data is not None:
+            print('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa')
+            print(store_data.keys())
+            #input()
+        
+        ## Return stored data
+        return store_data
+    return upload_data_callback
+        
+app.callback(
+    Output("store", "data"),
+    #Output("output-data-upload", "children"),
+    [
+        Input("upload-data", "filename"),
+        Input("upload-data", "contents"),
+    ],
+    [
+        State("store", "data"),
+    ],
+    #[State('upload-data', 'filename')],
+)(generate_upload_data_callback())
 
 
+def generate_uploaded_dfs_callback():
+    def uploaded_dfs_callback(dict_dfs):
+        children = [
+            get_row(roi_mean_gm(dict_dfs, dset)) for dset in dict_dfs.keys()
+        ]
+        return children
+        
+    return uploaded_dfs_callback
 
 
+app.callback(
+    Output("uploaded_dfs", "children"),
+    #Output("output-data-upload", "children"),
+    [
+        Input("store", "data"),
+    ],
+    #[
+        #State("uploaded_dfs", "children"),
+    #],
+)(generate_uploaded_dfs_callback())
 
 
 if __name__ == "__main__":
