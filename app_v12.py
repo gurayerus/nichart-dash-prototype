@@ -59,7 +59,10 @@ dsets_data = {
     #"Dset2": pd.read_csv(DATA_PATH.joinpath("Dset2_n100.csv"), index_col=1),
 }
 
-
+dsets_data2 = {
+    "Dset1": pd.read_csv(DATA_PATH.joinpath("Dset1_n100.csv"), index_col=1).to_dict('records'),
+    #"Dset2": pd.read_csv(DATA_PATH.joinpath("Dset2_n100.csv"), index_col=1),
+}
 
 # Currency dsets
 dsets = ["Dset1"]
@@ -399,10 +402,39 @@ app.layout = html.Div(
                         # Allow multiple files to be uploaded
                         multiple=True
                     ),
-                    dcc.Store(id='store'),
-                    html.H2("File List"),
-                    html.Ul(id="file-list"),                    
-                    html.Div(id='output-data-upload'),
+                    dcc.Store(id = 'df_store',
+                              data = dsets_data2
+                              
+                              ),
+                    html.H4("Current dataset"),
+
+                    # Dropdown file list
+                    html.Div(
+                        className="graph-top-right inline-block",
+                        children=[
+                            html.Div(
+                                className="inline-block",
+                                children=[
+                                    dcc.Dropdown(
+                                        className="dropdown-roi",
+                                        id = "dropdown_files",
+                                        options=[
+                                            {'label': i, 'value': i} for i in ['Dset1']
+                                        ],
+                                        value = 'Dset1',
+                                        clearable=False,
+                                    )
+                                ],
+                            ),
+                            #html.Span(
+                                #id = "close",
+                                #className="chart-close inline-block float-right",
+                                #children="×",
+                                #n_clicks=0,
+                            #),
+                        ],
+                    ),
+
                 ]),
                 
                 # File View Div
@@ -506,15 +538,20 @@ def generate_chart_button_callback():
     #return chart_fig_callback
 
 # Function to update Graph Figure
-def generate_figure_callback(curr_plot, curr_dset):
+def generate_figure_callback(curr_plot):
     #def chart_fig_callback(dsets, t, p, r, old_fig):
-    def chart_fig_callback(dsets, t, p, r):
+    def chart_fig_callback(dsets, t, p, r, dfl, dfd):
+
+
+        curr_dset = pd.DataFrame.from_dict(dfd[dfl])
 
         print('OOOO')
+        print(dfl)
         print(t)
         print(p)
         print(r)
 
+        
         if curr_dset is None:
             return {"layout": {}, "data": {}}
 
@@ -789,10 +826,9 @@ def generate_contents_for_left_panel():
 # Loop through all plot_names
 for curr_plot in plot_names:
     
-    curr_dset = dsets_data['Dset1']
-    print('aaaaeee')
-    print(dsets_data['Dset1'])
-    print(curr_dset.shape)
+    #print('aaaaeee')
+    #print(dsets_data['Dset1'])
+    #print(curr_dset.shape)
     
 
     # Callback for Buy/Sell and Chart Buttons for Left Panel
@@ -815,10 +851,11 @@ for curr_plot in plot_names:
             Input(curr_plot + "plot_layers", "value"),            
             Input(curr_plot + "dropdown_roi", "value"),
         ],
-        #[
-            #State(curr_plot + "chart", "figure"),
-        #],
-    )(generate_figure_callback(curr_plot, curr_dset))
+        [
+            State('dropdown_files', 'value'),
+            State('df_store', 'data'),            
+        ],
+    )(generate_figure_callback(curr_plot))
 
     # close graph by setting to 0 n_clicks property
     app.callback(
@@ -864,16 +901,92 @@ app.callback(
     [State("plots_clicked", "children")],
 )(generate_chart_button_callback())
 
-## Callback to update live clock
-#@app.callback(Output("live_clock", "children"), [Input("interval", "n_intervals")])
-#def update_time(n):
-    #return datetime.datetime.now().strftime("%H:%M:%S")
 
 
-## Callback to update news
-#@app.callback(Output("news", "children"), [Input("i_news", "n_intervals")])
-#def update_news_div(n):
-    #return update_news()
+
+### Read uploaded dfs
+def parse_contents(contents, filename):
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    try:
+        if 'csv' in filename:
+            # Assume that the user uploaded a CSV file
+            df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+            
+    except Exception as e:
+        return None
+
+    df = df.to_dict(orient='records')
+    return df
+
+def generate_upload_data_callback():
+    def upload_data_callback(list_of_names, list_of_contents, store_data):
+        
+        ## Initialize empty dictionary for the storage
+        if store_data is None:
+            store_data = {}
+        
+        ## Read data files
+        dfs = []
+        if list_of_contents is not None:
+            dfs = [
+                parse_contents(c, n) for c, n in zip(list_of_contents, list_of_names)]
+
+        ## Add dfs to storage
+        for i, tmp_df in enumerate(dfs):
+            if tmp_df is not None:                
+                tmp_name = list_of_names[i]
+                
+                print('BBB')
+                print(len(tmp_name))
+                #input()
+                
+                if tmp_name in store_data.keys():
+                    print('File already in storage, skipping !')
+                else:
+                    store_data[tmp_name] = tmp_df
+
+        if store_data is not None:
+            print('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa')
+            print(store_data.keys())
+            #input()
+        
+        ## Return stored data
+        return store_data
+    return upload_data_callback
+        
+app.callback(
+    Output("df_store", "data"),
+    #Output("output-data-upload", "children"),
+    [
+        Input("upload-data", "filename"),
+        Input("upload-data", "contents"),
+    ],
+    [
+        State("df_store", "data"),
+    ],
+    #[State('upload-data', 'filename')],
+)(generate_upload_data_callback())
+
+
+def generate_uploaded_dfs_callback():
+    def uploaded_dfs_callback(dict_dfs):
+        dict_options =  [{'label': i, 'value': i} for i in dict_dfs.keys()]
+        return dict_options
+        
+    return uploaded_dfs_callback
+
+
+app.callback(
+    Output("dropdown_files", "options"),
+    #Output("output-data-upload", "children"),
+    [
+        Input("df_store", "data"),
+    ],
+    #[
+        #State("uploaded_dfs", "children"),
+    #],
+)(generate_uploaded_dfs_callback())
 
 
 if __name__ == "__main__":
