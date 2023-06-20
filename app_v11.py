@@ -307,7 +307,7 @@ def chart_div(curr_plot):
                     html.Span(
                         id = curr_plot + "menu_button",
                         className="inline-block chart-title",
-                        children=f"{dset} ☰",
+                        children=f"{curr_plot} ☰",
                         n_clicks=0,
                     ),
                     # Dropdown and close button float right
