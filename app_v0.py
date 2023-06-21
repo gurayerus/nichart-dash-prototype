@@ -26,7 +26,7 @@ app.title = "FOREX Web Trader"
 server = app.server
 
 PATH = pathlib.Path(__file__).parent
-DATA_PATH = PATH.joinpath("data").resolve()
+DATA_PATH = PATH.joinpath("data/Tmp").resolve()
 
 # Loading historical tick data
 currency_pair_data = {
