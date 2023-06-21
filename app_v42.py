@@ -192,31 +192,34 @@ def create_div_plot(curr_plot):
                                 children=[
                                     dcc.Dropdown(
                                         className="dropdown-roi",
+                                        id = curr_plot + "dropdown_plot_refdata",
+                                        clearable=False,
+                                        #placeholder="Reference Data",
+                                    )
+                                ],
+                            ),
+                            html.Div(
+                                className="inline-block",
+                                children=[
+                                    dcc.Dropdown(
+                                        className="dropdown-roi",
+                                        id = curr_plot + "dropdown_plot_userdata",
+                                        clearable=False,
+                                        #placeholder="User Data",
+                                    )
+                                ],
+                            ),
+                            html.Div(
+                                className="inline-block",
+                                children=[
+                                    dcc.Dropdown(
+                                        className="dropdown-roi",
                                         id = curr_plot + "dropdown_roi",
                                         options=[
                                             {'label': i, 'value': i} for i in ROI_NAMES
                                         ],
                                         value = ROI_NAMES[0],
-                                        clearable=False,
-                                    )
-                                ],
-                            ),
-                            html.Div(
-                                className="inline-block",
-                                children=[
-                                    dcc.Dropdown(
-                                        className="dropdown-plot-refdata",
-                                        id = curr_plot + "dropdown_plot_refdata",
-                                        clearable=False,
-                                    )
-                                ],
-                            ),
-                            html.Div(
-                                className="inline-block",
-                                children=[
-                                    dcc.Dropdown(
-                                        className="dropdown-plot-userdata",
-                                        id = curr_plot + "dropdown_plot_userdata",
+                                        placeholder="ROI",                                        
                                         clearable=False,
                                     )
                                 ],
@@ -537,6 +540,11 @@ def generate_plot_set_visibility_callback(curr_plot):
         return classes
     return plot_set_visibility_callback
 
+def generate_uploaded_dfs_callback():
+    def uploaded_dfs_callback(dict_dfs):
+        dict_options =  [{'label': i, 'value': i} for i in dict_dfs.keys()]
+        return dict_options
+    return uploaded_dfs_callback
 
 ######################################################
 # Loop through all plots
@@ -595,6 +603,21 @@ for curr_plot in plot_names:
         Output(curr_plot + "plot_layers_tab", "style"), 
         [Input(curr_plot + "menu_tab", "children")]
     )(generate_plot_layers_content_tab_callback())
+    
+    app.callback(
+        Output(curr_plot + "dropdown_plot_refdata", "options"),
+        [
+            Input("store_data_ref", "data"),
+        ],
+    )(generate_uploaded_dfs_callback())
+
+    app.callback(
+        Output(curr_plot + "dropdown_plot_userdata", "options"),
+        [
+            Input("store_data_user", "data"),
+        ],
+    )(generate_uploaded_dfs_callback())
+    
 ######################################################
 
 
@@ -679,12 +702,6 @@ app.callback(
 
 #######################################################
 ## Update dropdown lists (based on data stored for reference data files and user data files)
-def generate_uploaded_dfs_callback():
-    def uploaded_dfs_callback(dict_dfs):
-        dict_options =  [{'label': i, 'value': i} for i in dict_dfs.keys()]
-        return dict_options
-    return uploaded_dfs_callback
-
 app.callback(
     Output("dropdown_data_ref", "options"),
     [
