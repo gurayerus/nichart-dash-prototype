@@ -57,7 +57,7 @@ plot_names = ["Plot" + str(i+1) for i in range(NUM_PLOTS)]
 #####################################################
 ## Functions to create different parts of the dashboard
 
-def create_plot(dset, type_trace, type_plotlayer, roi):
+def create_plot(dset_ref, dset_user, type_trace, type_plotlayer, roi):
     ''' Create a figure for a single plot (generated using user selections)
     '''
 
@@ -67,8 +67,8 @@ def create_plot(dset, type_trace, type_plotlayer, roi):
     yvar = roi
 
     # Get data
-    if isinstance(dset, pd.DataFrame) == False:
-        dset = pd.DataFrame.from_dict(dset)
+    if isinstance(dset_ref, pd.DataFrame) == False:
+        dset_ref = pd.DataFrame.from_dict(dset_ref)
 
     sel_plot_layers = []
     row = 1
@@ -87,11 +87,11 @@ def create_plot(dset, type_trace, type_plotlayer, roi):
     )
 
     # Add main trace (style) to figure
-    fig.append_trace(eval(type_trace)(dset, xvar, yvar), 1, 1)
+    fig.append_trace(eval(type_trace)(dset_ref, xvar, yvar), 1, 1)
 
     # Add layers 
     for sel_layer in sel_plot_layers:
-        fig = eval(sel_layer)(dset, xvar, yvar, fig)
+        fig = eval(sel_layer)(dset_ref, xvar, yvar, fig)
 
     fig["layout"][
         "uirevision"
@@ -244,19 +244,6 @@ def create_div_plot(curr_plot):
             ),
         ],
     )
-                
-# Set a hidden var to keep plot visibility status
-def get_plot_vis(curr_plot):
-    if curr_plot in ["Plot1"]:
-        return html.Div(
-            id=curr_plot + "_vis_stat",
-            n_clicks = 1
-        )                
-    else:
-        return html.Div(
-            id=curr_plot + "_vis_stat",
-            n_clicks = 0
-        )                
 
 # Dash App Layout
 app.layout = html.Div(
@@ -407,13 +394,6 @@ app.layout = html.Div(
                         n_clicks = 0,
                     )
                 ]),
-                    
-                # Hidden div to keep info for visible/hidden plots
-                html.Div(
-                        id="plots-vis",
-                        children=[get_plot_vis(curr_plot) for curr_plot in plot_names],
-                ),
-                    
             ],
                     
         ),
@@ -433,10 +413,10 @@ app.layout = html.Div(
         ),
 
         # Hidden div that stores all clicked plots
-        html.Div(id="plots_visible", children = 'Plot1', style={"display": "none"}),
-        
-        # Hidden div that stores all clicked plots
         html.Div(id="plots_visible_arr", children = ['Plot1'], style={"display": "none"}),
+
+        ## Hidden div that stores all clicked plots
+        #html.Div(id="plots_visible_arr", children = [], style={"display": "none"}),
         
     ],
 )
@@ -471,12 +451,41 @@ def generate_change_plot_vis_callback():
 
 # Function to update plot figure
 def generate_figure_callback(curr_plot):
-    def chart_fig_callback(plot_type, plot_layers, sel_roi, sel_file, data_store):
-        curr_dset = pd.DataFrame.from_dict(data_store[sel_file])
-        if curr_dset is None:
+    def chart_fig_callback(plot_type, plot_layers, sel_ref_df, sel_user_df, 
+                           sel_roi, data_store_ref, data_store_user):
+        
+        fig = tools.make_subplots(
+            rows=1,
+            shared_xaxes=True,
+            shared_yaxes=True,
+            cols=1,
+            print_grid=False,
+            vertical_spacing=0.12,
+        )
+        
+        print('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
+        print(sel_ref_df)
+        print(sel_user_df)
+        print('zzzzyyyyyyyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
+
+        if sel_ref_df is None:
+            return fig
+        
+        if sel_user_df is None:
+            return fig
+        
+        
+        curr_ref_dset = pd.DataFrame.from_dict(data_store_ref[sel_ref_df])
+        curr_user_dset = pd.DataFrame.from_dict(data_store_user[sel_user_df])
+        
+        print(curr_ref_dset.shape)
+        print(curr_user_dset.shape)
+        print('yyyyyyyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
+        
+        if curr_ref_dset is None:
             return {"layout": {}, "data": {}}
 
-        fig = create_plot(curr_dset, plot_type, plot_layers, sel_roi)
+        fig = create_plot(curr_ref_dset, curr_user_dset, plot_type, plot_layers, sel_roi)
         return fig
 
     return chart_fig_callback
@@ -543,82 +552,10 @@ def generate_plot_set_visibility_callback(curr_plot):
 def generate_uploaded_dfs_callback():
     def uploaded_dfs_callback(dict_dfs):
         dict_options =  [{'label': i, 'value': i} for i in dict_dfs.keys()]
-        return dict_options
+        sel_val = list(dict_dfs.keys())[0]
+        return dict_options, sel_val
     return uploaded_dfs_callback
 
-######################################################
-# Loop through all plots
-for curr_plot in plot_names:
-    
-    ## Callback to make plot visible/invisible
-    ## - This is done by modifying the className property of the plot
-    ## - className sets the style to display the plot and is defined in the css  
-    app.callback(
-        Output(curr_plot + "_graph_div", "className"), 
-        [Input("plots_visible_arr", "children")]
-    )(generate_plot_set_visibility_callback(curr_plot))
-    
-    # Callback to update the plot drawing
-    app.callback(
-        Output(curr_plot + "chart", "figure"),
-        [
-            Input(curr_plot + "plot_type", "value"),
-            Input(curr_plot + "plot_layers", "value"),            
-            Input(curr_plot + "dropdown_roi", "value"),
-        ],
-        [
-            State('dropdown_data_ref', 'value'),
-            State('store_data_ref', 'data'),            
-        ],
-    )(generate_figure_callback(curr_plot))
-
-    # Show or hide graph menu
-    app.callback(
-        Output(curr_plot + "menu", "className"),
-        [Input(curr_plot + "_menu_button", "n_clicks")],
-        [State(curr_plot + "menu", "className")],
-    )(generate_open_close_menu_callback())
-
-    # Callback to update menu and header visibility for a plot
-    app.callback(
-        [
-            Output(curr_plot + "menu_tab", "children"),
-            Output(curr_plot + "style_header", "className"),
-            Output(curr_plot + "plot_layers_header", "className"),
-        ],
-        [
-            Input(curr_plot + "style_header", "n_clicks_timestamp"),
-            Input(curr_plot + "plot_layers_header", "n_clicks_timestamp"),
-        ],
-    )(generate_active_menu_tab_callback())
-
-    # Callback to hide/show STYLE tab content
-    app.callback(
-        Output(curr_plot + "style_tab", "style"),
-        [Input(curr_plot + "menu_tab", "children")]
-    )(generate_style_content_tab_callback())
-
-    # Callback to hide/show MENU tab content
-    app.callback(
-        Output(curr_plot + "plot_layers_tab", "style"), 
-        [Input(curr_plot + "menu_tab", "children")]
-    )(generate_plot_layers_content_tab_callback())
-    
-    app.callback(
-        Output(curr_plot + "dropdown_plot_refdata", "options"),
-        [
-            Input("store_data_ref", "data"),
-        ],
-    )(generate_uploaded_dfs_callback())
-
-    app.callback(
-        Output(curr_plot + "dropdown_plot_userdata", "options"),
-        [
-            Input("store_data_user", "data"),
-        ],
-    )(generate_uploaded_dfs_callback())
-    
-######################################################
 
 
 #######################################################
@@ -703,20 +640,100 @@ app.callback(
 #######################################################
 ## Update dropdown lists (based on data stored for reference data files and user data files)
 app.callback(
-    Output("dropdown_data_ref", "options"),
+    [Output("dropdown_data_ref", "options"),
+     Output("dropdown_data_ref", "value")],
     [
         Input("store_data_ref", "data"),
     ],
 )(generate_uploaded_dfs_callback())
 
 app.callback(
-    Output("dropdown_data_user", "options"),
+    [Output("dropdown_data_user", "options"),
+     Output("dropdown_data_user", "value")],
     [
         Input("store_data_user", "data"),
     ],
 )(generate_uploaded_dfs_callback())
 #######################################################
 
+
+######################################################
+# Loop through all plots
+for curr_plot in plot_names:
+    
+    ## Callback to make plot visible/invisible
+    ## - This is done by modifying the className property of the plot
+    ## - className sets the style to display the plot and is defined in the css  
+    app.callback(
+        Output(curr_plot + "_graph_div", "className"), 
+        [Input("plots_visible_arr", "children")]
+    )(generate_plot_set_visibility_callback(curr_plot))
+    
+    # Callback to update the plot drawing
+    app.callback(
+        Output(curr_plot + "chart", "figure"),
+        [
+            Input(curr_plot + "plot_type", "value"),
+            Input(curr_plot + "plot_layers", "value"),            
+            Input(curr_plot + "dropdown_plot_refdata", "value"),
+            Input(curr_plot + "dropdown_plot_userdata", "value"),
+            Input(curr_plot + "dropdown_roi", "value"),
+        ],
+        [
+            State('store_data_ref', 'data'),            
+            State('store_data_user', 'data'),            
+        ],
+    )(generate_figure_callback(curr_plot))
+
+    # Show or hide graph menu
+    app.callback(
+        Output(curr_plot + "menu", "className"),
+        [Input(curr_plot + "_menu_button", "n_clicks")],
+        [State(curr_plot + "menu", "className")],
+    )(generate_open_close_menu_callback())
+
+    # Callback to update menu and header visibility for a plot
+    app.callback(
+        [
+            Output(curr_plot + "menu_tab", "children"),
+            Output(curr_plot + "style_header", "className"),
+            Output(curr_plot + "plot_layers_header", "className"),
+        ],
+        [
+            Input(curr_plot + "style_header", "n_clicks_timestamp"),
+            Input(curr_plot + "plot_layers_header", "n_clicks_timestamp"),
+        ],
+    )(generate_active_menu_tab_callback())
+
+    # Callback to hide/show STYLE tab content
+    app.callback(
+        Output(curr_plot + "style_tab", "style"),
+        [Input(curr_plot + "menu_tab", "children")]
+    )(generate_style_content_tab_callback())
+
+    # Callback to hide/show MENU tab content
+    app.callback(
+        Output(curr_plot + "plot_layers_tab", "style"), 
+        [Input(curr_plot + "menu_tab", "children")]
+    )(generate_plot_layers_content_tab_callback())
+    
+    app.callback(
+        [Output(curr_plot + "dropdown_plot_refdata", "options"),
+         Output(curr_plot + "dropdown_plot_refdata", "value")],
+        [
+            Input("store_data_ref", "data"),
+        ],
+    )(generate_uploaded_dfs_callback())
+
+    app.callback(
+        [Output(curr_plot + "dropdown_plot_userdata", "options"),
+         Output(curr_plot + "dropdown_plot_userdata", "value")],
+        [
+            Input("store_data_user", "data"),
+        ],
+    )(generate_uploaded_dfs_callback())
+    
+######################################################
 
 if __name__ == "__main__":
     app.run_server(debug=True)
