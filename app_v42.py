@@ -15,30 +15,23 @@ import dash_html_components as html
 import plotly.plotly as py
 import plotly.graph_objs as go
 from sklearn.linear_model import LinearRegression
-
 import base64
-
 from dash.dependencies import Input, Output, State
 from plotly import tools
-
 from utils_trace import *
 
 app = dash.Dash(
     __name__, meta_tags=[{"name": "viewport", "content": "width=device-width"}],
 )
-
-## Title of the app
 app.title = "NiChart"
-
 server = app.server
-
-## Path for data and assets
 PATH = pathlib.Path(__file__).parent
 DATA_PATH = PATH.joinpath("data").resolve()
 
-## List of plots (max 4 plots are allowed)
-plot_names = ["Plot1", "Plot2", "Plot3", "Plot4"]
-#plot_names = ["Plot1", "Plot2"]
+#####################################################
+## Hard coded parameters
+## FIXME : this part will be modified in final version
+NUM_PLOTS = 4
 
 ## Initial reference data files
 ##  csv files used as reference; users can upload additional ones
@@ -53,19 +46,27 @@ dsets_user = {
     "Dset2_n100": pd.read_csv(DATA_PATH.joinpath("Dset2_n100.csv"), index_col=1).to_dict('records'),
 }
 
-## ROI names 
-## Tmp FIXME
-tmp_col = pd.DataFrame.from_dict(dsets_ref['Dset1_n100']).columns
-#tmp_col = dsets_ref['Dset1_n100'].columns
+## Get ROI names
+tmp_col = pd.DataFrame.from_dict(list(dsets_ref.values())[0]).columns
 ROI_NAMES = tmp_col[tmp_col.str.contains('MUSE')].tolist()
+#####################################################
 
+## List of plot names
+plot_names = ["Plot" + str(i+1) for i in range(NUM_PLOTS)]
+
+#####################################################
+## Functions to create different parts of the dashboard
 
 def create_plot(dset, type_trace, type_plotlayer, roi):
-    ''' Create a plot using given parameters 
+    ''' Create a figure for a single plot (generated using user selections)
     '''
 
+    ## Set x, y variables for the plot
+    ##   FIXME   x var is hard-coded for now
+    xvar = 'Age_At_Visit'
+    yvar = roi
+
     # Get data
-    #df = dsets_ref[dset]
     if isinstance(dset, pd.DataFrame) == False:
         dset = pd.DataFrame.from_dict(dset)
 
@@ -76,7 +77,6 @@ def create_plot(dset, type_trace, type_plotlayer, roi):
         for sel_layer in type_plotlayer:
             sel_plot_layers.append(sel_layer)
 
-
     fig = tools.make_subplots(
         rows=row,
         shared_xaxes=True,
@@ -85,10 +85,6 @@ def create_plot(dset, type_trace, type_plotlayer, roi):
         print_grid=False,
         vertical_spacing=0.12,
     )
-
-    ## FIXME   hard coded x for now
-    xvar = 'Age_At_Visit'
-    yvar = roi
 
     # Add main trace (style) to figure
     fig.append_trace(eval(type_trace)(dset, xvar, yvar), 1, 1)
@@ -115,18 +111,14 @@ def create_plot(dset, type_trace, type_plotlayer, roi):
 def create_div_plot(curr_plot):
     ''' Returns html div for a single plot
     '''
-    
-    dset = dsets_ref['Dset1_n100']
-    
     return html.Div(
         id = curr_plot + "_graph_div",
         
-        ## FIXME
-        className="display-none",
+        className="display-none",               ## This is used to make figure visible/non-visible
         #className="chart-style six columns",
         
         children=[
-            # Menu for Currency Graph
+            # Menu for the plot
             html.Div(
                 id = curr_plot + "menu",
                 #className="not_visible",
@@ -186,7 +178,7 @@ def create_div_plot(curr_plot):
                 className="row chart-top-bar",
                 children=[
                     html.Span(
-                        id = curr_plot + "menu_button",
+                        id = curr_plot + "_menu_button",
                         className="inline-block chart-title",
                         children=f"{curr_plot} ☰",
                         n_clicks=0,
@@ -205,6 +197,26 @@ def create_div_plot(curr_plot):
                                             {'label': i, 'value': i} for i in ROI_NAMES
                                         ],
                                         value = ROI_NAMES[0],
+                                        clearable=False,
+                                    )
+                                ],
+                            ),
+                            html.Div(
+                                className="inline-block",
+                                children=[
+                                    dcc.Dropdown(
+                                        className="dropdown-plot-refdata",
+                                        id = curr_plot + "dropdown_plot_refdata",
+                                        clearable=False,
+                                    )
+                                ],
+                            ),
+                            html.Div(
+                                className="inline-block",
+                                children=[
+                                    dcc.Dropdown(
+                                        className="dropdown-plot-userdata",
+                                        id = curr_plot + "dropdown_plot_userdata",
                                         clearable=False,
                                     )
                                 ],
@@ -430,39 +442,31 @@ app.layout = html.Div(
 # Dynamic Callbacks
 ##########################################################################
 
-# returns string containing clicked charts
-def generate_new_plot_button_callback():
-    def new_plot_button_callback(n, vis_arr):
-    
-        for tmp_plot in plot_names:
-            if tmp_plot not in vis_arr:
-                vis_arr = vis_arr + [tmp_plot]
-                print('ggg')
-                print(vis_arr)
-                return vis_arr
+# Updates if plots are visible/non-visible (returns a list of active plots)
+def generate_change_plot_vis_callback():
+    def change_plot_vis_callback(*args):
+
+        changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
+        vis_arr = args[-1]
+
+        ## Add new plot
+        if 'new_plot_button' in changed_id:
+            for tmp_plot in plot_names:
+                if tmp_plot not in vis_arr:
+                    vis_arr = vis_arr + [tmp_plot]
+                    return vis_arr
+                    
+        ## Delete plot
+        #for i in range(1, len(plot_names)+1):
+        for i in range(0, len(plot_names)):
+            curr_plot = plot_names[i]
+            if curr_plot + "_close" in changed_id:
+                vis_arr = [x for x in vis_arr if x != curr_plot]
         return vis_arr
             
-    return new_plot_button_callback
+    return change_plot_vis_callback
 
-
-# returns string containing visible plots
-def generate_plot_vis_callback():
-    def plot_vis_callback(*args):
-        vis_plot_names = ''
-        for i in range(len(plot_names)):
-            if args[i] > 0:
-                if vis_plot_names:
-                    vis_plot_names = vis_plot_names + "," + plot_names[i]
-                else:
-                    vis_plot_names = plot_names[i]
-        print('uuuuuuuuuuuuuuuuuuuuuuuuuuuuuu')
-        print(args)
-        print(vis_plot_names)
-                
-        return vis_plot_names
-    return plot_vis_callback
-
-# Function to update Graph Figure
+# Function to update plot figure
 def generate_figure_callback(curr_plot):
     def chart_fig_callback(plot_type, plot_layers, sel_roi, sel_file, data_store):
         curr_dset = pd.DataFrame.from_dict(data_store[sel_file])
@@ -475,20 +479,7 @@ def generate_figure_callback(curr_plot):
     return chart_fig_callback
 
 
-# Function to close currency dset graph
-def generate_close_plot_callback():
-    def close_callback(n_close, n_init):
-        print('kkkkkkkkkkkkkkkkkkkkkkkkkk')
-        print(n_close)
-        print(n_init)
-
-        if n_close > 0:
-            return 0
-        else:
-            return n_init
-    return close_callback
-
-# Function to open or close STYLE or STUDIES menu
+# Function to open or close Style or PlotLayers menus
 def generate_open_close_menu_callback():
     def open_close_menu(n, className):
         if n == 0:
@@ -531,66 +522,35 @@ def generate_style_content_tab_callback():
     return style_tab
 
 # Resize plotting div according to the number of plots displayed
-def generate_show_hide_graph_div_callback(curr_plot):
-    def show_graph_div_callback(plots_visible):
-
-        if curr_plot not in plots_visible:
+def generate_plot_set_visibility_callback(curr_plot):
+    def plot_set_visibility_callback(plots_visible_arr):
+        if curr_plot not in plots_visible_arr:
             return "display-none"
-
-        plots_visible = plots_visible.split(",")  # [:4] max of 4 graph
-        len_list = len(plots_visible)
-
-        print('ssssssssssssssssssssssssssssssssssss')
-        print(len_list)
-
+        len_vis_plots = len(plots_visible_arr)
         classes = "chart-style"
-        if len_list % 2 == 0:
+        if len_vis_plots % 2 == 0:
             classes = classes + " six columns"
-        elif len_list == 3:
+        elif len_vis_plots == 3:
             classes = classes + " four columns"
         else:
             classes = classes + " twelve columns"
         return classes
-
-    return show_graph_div_callback
-
-def generate_active_menu_tab_callback():
-    def update_current_tab_name(n_style, n_plot_layers):
-        if n_style >= n_plot_layers:
-            return "Style", "span-menu selected", "span-menu"
-        return "PlotLayers", "span-menu", "span-menu selected"
-
-    return update_current_tab_name
-
-def generate_style_content_tab_callback():
-    def style_tab(current_tab):
-        if current_tab == "Style":
-            return {"display": "block", "textAlign": "left", "marginTop": "30"}
-        return {"display": "none"}
-
-    return style_tab
-
-def generate_plot_layers_content_tab_callback():
-    def plot_layers_tab(current_tab):
-        if current_tab == "PlotLayers":
-            return {"display": "block", "textAlign": "left", "marginTop": "30"}
-        return {"display": "none"}
-
-    return plot_layers_tab
+    return plot_set_visibility_callback
 
 
 ######################################################
 # Loop through all plots
-
 for curr_plot in plot_names:
     
-    # Callback to make plot visible/invisible
+    ## Callback to make plot visible/invisible
+    ## - This is done by modifying the className property of the plot
+    ## - className sets the style to display the plot and is defined in the css  
     app.callback(
         Output(curr_plot + "_graph_div", "className"), 
-        [Input("plots_visible", "children")]
-    )(generate_show_hide_graph_div_callback(curr_plot))
+        [Input("plots_visible_arr", "children")]
+    )(generate_plot_set_visibility_callback(curr_plot))
     
-    # Callback to update the actual graph
+    # Callback to update the plot drawing
     app.callback(
         Output(curr_plot + "chart", "figure"),
         [
@@ -604,21 +564,14 @@ for curr_plot in plot_names:
         ],
     )(generate_figure_callback(curr_plot))
 
-    # Update plots_visible
-    app.callback(
-        Output(curr_plot + "_vis_stat", "n_clicks"),
-        [Input(curr_plot + "_close", "n_clicks")],
-        [State(curr_plot + "_vis_stat", "n_clicks")],
-    )(generate_close_plot_callback())
-
-    # show or hide graph menu
+    # Show or hide graph menu
     app.callback(
         Output(curr_plot + "menu", "className"),
-        [Input(curr_plot + "menu_button", "n_clicks")],
+        [Input(curr_plot + "_menu_button", "n_clicks")],
         [State(curr_plot + "menu", "className")],
     )(generate_open_close_menu_callback())
 
-    # stores in hidden div name of clicked tab name
+    # Callback to update menu and header visibility for a plot
     app.callback(
         [
             Output(curr_plot + "menu_tab", "children"),
@@ -631,34 +584,35 @@ for curr_plot in plot_names:
         ],
     )(generate_active_menu_tab_callback())
 
-    # hide/show STYLE tab content if clicked or not
+    # Callback to hide/show STYLE tab content
     app.callback(
-        Output(curr_plot + "style_tab", "style"), [Input(curr_plot + "menu_tab", "children")]
+        Output(curr_plot + "style_tab", "style"),
+        [Input(curr_plot + "menu_tab", "children")]
     )(generate_style_content_tab_callback())
 
-    # hide/show MENU tab content if clicked or not
+    # Callback to hide/show MENU tab content
     app.callback(
-        Output(curr_plot + "plot_layers_tab", "style"), [Input(curr_plot + "menu_tab", "children")]
+        Output(curr_plot + "plot_layers_tab", "style"), 
+        [Input(curr_plot + "menu_tab", "children")]
     )(generate_plot_layers_content_tab_callback())
+######################################################
 
-# creates new plot
+
+#######################################################
+# Updates if a plot is visible/non-visible
+# - "new plot button" clicked: make the first non-visible plot visible
+# - "delete button" (x) on a plot is clicked: make the plot non-visible
 app.callback(
     Output("plots_visible_arr", "children"), 
-    [Input("new_plot_button", "n_clicks")],
-    [State("plots_visible_arr", "children")]
-)(generate_new_plot_button_callback())
+    [Input("new_plot_button", "n_clicks")] + 
+    [Input(curr_plot + "_close", "n_clicks") for curr_plot in plot_names],
+    [State("plots_visible_arr", "children")], 
+)(generate_change_plot_vis_callback())
+#######################################################
 
 
-# updates hidden div with all the clicked charts
-app.callback(
-    Output("plots_visible", "children"),
-    [Input(curr_plot + "_vis_stat", "n_clicks") for curr_plot in plot_names],
-)(generate_plot_vis_callback())
-
-
-######################################################
+#######################################################
 # Upload data files
-
 ### Read uploaded dfs
 def parse_contents(contents, filename):
     content_type, content_string = contents.split(',')
@@ -677,7 +631,6 @@ def parse_contents(contents, filename):
 ## Upload files
 def generate_upload_data_callback():
     def upload_data_callback(list_of_names, list_of_contents, store_data):
-        
         ## Initialize empty dictionary for the storage
         if store_data is None:
             store_data = {}
@@ -685,20 +638,14 @@ def generate_upload_data_callback():
         ## Read data files
         dfs = []
         if list_of_contents is not None:
-            dfs = [
-                parse_contents(c, n) for c, n in zip(list_of_contents, list_of_names)]
+            dfs = [parse_contents(c, n) for c, n in zip(list_of_contents, list_of_names)]
 
         ## Add dfs to storage
         for i, tmp_df in enumerate(dfs):
             if tmp_df is not None:                
                 tmp_name = list_of_names[i]
-                
-                print('BBB')
-                print(len(tmp_name))
-                #input()
-                
                 if tmp_name in store_data.keys():
-                    print('File already in storage, skipping !')
+                    print('Warning: file already in storage, skipping !')
                 else:
                     store_data[tmp_name] = tmp_df
         
@@ -727,11 +674,11 @@ app.callback(
         State("store_data_user", "data"),
     ],
 )(generate_upload_data_callback())
-
+#######################################################
 
 
 #######################################################
-## Update dropdown list with uploaded files
+## Update dropdown lists (based on data stored for reference data files and user data files)
 def generate_uploaded_dfs_callback():
     def uploaded_dfs_callback(dict_dfs):
         dict_options =  [{'label': i, 'value': i} for i in dict_dfs.keys()]
@@ -751,12 +698,7 @@ app.callback(
         Input("store_data_user", "data"),
     ],
 )(generate_uploaded_dfs_callback())
-
-
-
-
-
-
+#######################################################
 
 
 if __name__ == "__main__":
