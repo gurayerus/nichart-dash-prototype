@@ -42,13 +42,19 @@ dsets_ref = {
 
 ## Initial user data files
 ##  csv files with user data; normally users will upload them
+#dsets_user = {
+    #"Dset2_n100": pd.read_csv(DATA_PATH.joinpath("Dset2_n100.csv"), index_col=1).to_dict('records'),
+#}
+
 dsets_user = {
-    "Dset2_n100": pd.read_csv(DATA_PATH.joinpath("Dset2_n100.csv"), index_col=1).to_dict('records'),
+    #"Dset2_n100": pd.read_csv(DATA_PATH.joinpath("Dset2_n100.csv"), index_col=1).to_dict('records'),
+    "Dset2": pd.read_csv(DATA_PATH.joinpath("Tmp/Dset2.csv"), index_col=1).to_dict('records'),
 }
 
 ## Get ROI names
 tmp_col = pd.DataFrame.from_dict(list(dsets_ref.values())[0]).columns
 ROI_NAMES = tmp_col[tmp_col.str.contains('MUSE')].tolist()
+NON_ROI_COLS = tmp_col[tmp_col.str.contains('MUSE') == False].tolist()[1:]
 #####################################################
 
 ## List of plot names
@@ -57,25 +63,29 @@ plot_names = ["Plot" + str(i+1) for i in range(NUM_PLOTS)]
 #####################################################
 ## Functions to create different parts of the dashboard
 
-def create_plot(dset_ref, dset_user, type_trace, type_plotlayer, roi):
+def create_plot(dset_ref, dset_user, type_trace, type_refdatalayer, type_userdatalayer, xvar, yvar):
     ''' Create a figure for a single plot (generated using user selections)
     '''
-
-    ## Set x, y variables for the plot
-    ##   FIXME   x var is hard-coded for now
-    xvar = 'Age_At_Visit'
-    yvar = roi
 
     # Get data
     if isinstance(dset_ref, pd.DataFrame) == False:
         dset_ref = pd.DataFrame.from_dict(dset_ref)
 
-    sel_plot_layers = []
+    if isinstance(dset_user, pd.DataFrame) == False:
+        dset_user = pd.DataFrame.from_dict(dset_user)
+
+    sel_ref_data_layers = []
+    row = 1
+    if len(type_refdatalayer) > 0:
+        for sel_layer in type_refdatalayer:
+            sel_ref_data_layers.append(sel_layer)
+
+    sel_user_data_layers = []
     row = 1
 
-    if len(type_plotlayer) > 0:
-        for sel_layer in type_plotlayer:
-            sel_plot_layers.append(sel_layer)
+    if len(type_userdatalayer) > 0:
+        for sel_layer in type_userdatalayer:
+            sel_user_data_layers.append(sel_layer)
 
     fig = tools.make_subplots(
         rows=row,
@@ -89,9 +99,13 @@ def create_plot(dset_ref, dset_user, type_trace, type_plotlayer, roi):
     # Add main trace (style) to figure
     fig.append_trace(eval(type_trace)(dset_ref, xvar, yvar), 1, 1)
 
-    # Add layers 
-    for sel_layer in sel_plot_layers:
+    # Add ref layers 
+    for sel_layer in sel_ref_data_layers:
         fig = eval(sel_layer)(dset_ref, xvar, yvar, fig)
+
+    # Add user data layers 
+    for sel_layer in sel_user_data_layers:
+        fig = eval(sel_layer)(dset_user, xvar, yvar, fig)
 
     fig["layout"][
         "uirevision"
@@ -127,7 +141,7 @@ def create_div_plot(curr_plot):
                     # stores current menu tab
                     html.Div(
                         id = curr_plot + "menu_tab",
-                        children=["PlotLayers"],
+                        children=["LayersData"],
                         style={"display": "none"},
                     ),
                     html.Span(
@@ -137,17 +151,38 @@ def create_div_plot(curr_plot):
                         n_clicks_timestamp=2,
                     ),
                     html.Span(
-                        "PlotLayers",
-                        id = curr_plot + "plot_layers_header",
+                        "LayersRef",
+                        id = curr_plot + "ref_data_layers_header",
                         className="span-menu",
                         n_clicks_timestamp=1,
                     ),
-                    # PlotLayers Checklist
+                    # LayersData Checklist
                     html.Div(
-                        id = curr_plot + "plot_layers_tab",
+                        id = curr_plot + "ref_data_layers_tab",
                         children=[
                             dcc.Checklist(
-                                id = curr_plot + "plot_layers",
+                                id = curr_plot + "ref_data_layers",
+                                options=[
+                                    {"label": "Lin Reg", "value": "linreg_trace"},
+                                    {"label": "Lowess Reg", "value": "lowess_trace"},
+                                ],
+                                value=[],
+                            )
+                        ],
+                        style={"display": "none"},
+                    ),
+                    html.Span(
+                        "LayersData",
+                        id = curr_plot + "user_data_layers_header",
+                        className="span-menu",
+                        n_clicks_timestamp=1,
+                    ),
+                    # LayersData Checklist
+                    html.Div(
+                        id = curr_plot + "user_data_layers_tab",
+                        children=[
+                            dcc.Checklist(
+                                id = curr_plot + "user_data_layers",
                                 options=[
                                     {"label": "Lin Reg", "value": "linreg_trace"},
                                     {"label": "Lowess Reg", "value": "lowess_trace"},
@@ -214,7 +249,22 @@ def create_div_plot(curr_plot):
                                 children=[
                                     dcc.Dropdown(
                                         className="dropdown-roi",
-                                        id = curr_plot + "dropdown_roi",
+                                        id = curr_plot + "dropdown_xvar",
+                                        options=[
+                                            {'label': i, 'value': i} for i in NON_ROI_COLS
+                                        ],
+                                        value = NON_ROI_COLS[0],
+                                        placeholder="ROI",                                        
+                                        clearable=False,
+                                    )
+                                ],
+                            ),
+                            html.Div(
+                                className="inline-block",
+                                children=[
+                                    dcc.Dropdown(
+                                        className="dropdown-roi",
+                                        id = curr_plot + "dropdown_yvar",
                                         options=[
                                             {'label': i, 'value': i} for i in ROI_NAMES
                                         ],
@@ -451,8 +501,8 @@ def generate_change_plot_vis_callback():
 
 # Function to update plot figure
 def generate_figure_callback(curr_plot):
-    def chart_fig_callback(plot_type, plot_layers, sel_ref_df, sel_user_df, 
-                           sel_roi, data_store_ref, data_store_user):
+    def chart_fig_callback(plot_type, ref_data_layers, user_data_layers, sel_ref_df, sel_user_df, 
+                           sel_xvar, sel_yvar, data_store_ref, data_store_user):
         
         fig = tools.make_subplots(
             rows=1,
@@ -485,13 +535,13 @@ def generate_figure_callback(curr_plot):
         if curr_ref_dset is None:
             return {"layout": {}, "data": {}}
 
-        fig = create_plot(curr_ref_dset, curr_user_dset, plot_type, plot_layers, sel_roi)
+        fig = create_plot(curr_ref_dset, curr_user_dset, plot_type, ref_data_layers, user_data_layers, sel_xvar, sel_yvar)
         return fig
 
     return chart_fig_callback
 
 
-# Function to open or close Style or PlotLayers menus
+# Function to open or close Style or LayersData menus
 def generate_open_close_menu_callback():
     def open_close_menu(n, className):
         if n == 0:
@@ -504,25 +554,40 @@ def generate_open_close_menu_callback():
     return open_close_menu
 
 # Function for hidden div that stores the last clicked menu tab
-# Also updates style and plot_layers menu headers
+# Also updates style and user_data_layers menu headers
 def generate_active_menu_tab_callback():
-    def update_current_tab_name(n_style, n_plot_layers):
-        if n_style >= n_plot_layers:
-            return "Style", "span-menu selected", "span-menu"
-        return "PlotLayers", "span-menu", "span-menu selected"
+    def update_current_tab_name(n_style, n_ref_data_layers, n_user_data_layers):
+        if n_style == np.max([n_style, n_ref_data_layers, n_user_data_layers]):
+            return "Style", "span-menu selected", "span-menu", "span-menu"
+        else:
+            if n_ref_data_layers == np.max([n_style, n_ref_data_layers, n_user_data_layers]):
+                return "LayersData", "span-menu", "span-menu selected","span-menu"
+        return "LayersRef", "span-menu", "span-menu", "span-menu selected"
 
     return update_current_tab_name
 
 
-# Function show or hide plot_layers menu for chart
-def generate_plot_layers_content_tab_callback():
-    def plot_layers_tab(current_tab):
-        if current_tab == "PlotLayers":
+# Function show or hide user_data_layers menu for chart
+def generate_user_data_layers_content_tab_callback():
+    def user_data_layers_content_tab_callback(current_tab):
+        if current_tab == "LayersData":
             return {"display": "block", "textAlign": "left", "marginTop": "30"}
         return {"display": "none"}
 
-    return plot_layers_tab
+    return user_data_layers_content_tab_callback
 
+# Function show or hide ref_data_layers menu for chart
+def generate_ref_data_layers_content_tab_callback():
+    def ref_data_layers_content_tab_callback(current_tab):
+        
+        print('asasasas')
+        print(current_tab)
+        
+        if current_tab == "LayersRef":
+            return {"display": "block", "textAlign": "left", "marginTop": "30"}
+        return {"display": "none"}
+
+    return ref_data_layers_content_tab_callback
 
 # Function show or hide style menu for chart
 def generate_style_content_tab_callback():
@@ -674,10 +739,12 @@ for curr_plot in plot_names:
         Output(curr_plot + "chart", "figure"),
         [
             Input(curr_plot + "plot_type", "value"),
-            Input(curr_plot + "plot_layers", "value"),            
+            Input(curr_plot + "ref_data_layers", "value"),            
+            Input(curr_plot + "user_data_layers", "value"),            
             Input(curr_plot + "dropdown_plot_refdata", "value"),
             Input(curr_plot + "dropdown_plot_userdata", "value"),
-            Input(curr_plot + "dropdown_roi", "value"),
+            Input(curr_plot + "dropdown_xvar", "value"),
+            Input(curr_plot + "dropdown_yvar", "value"),
         ],
         [
             State('store_data_ref', 'data'),            
@@ -697,11 +764,13 @@ for curr_plot in plot_names:
         [
             Output(curr_plot + "menu_tab", "children"),
             Output(curr_plot + "style_header", "className"),
-            Output(curr_plot + "plot_layers_header", "className"),
+            Output(curr_plot + "ref_data_layers_header", "className"),
+            Output(curr_plot + "user_data_layers_header", "className"),
         ],
         [
             Input(curr_plot + "style_header", "n_clicks_timestamp"),
-            Input(curr_plot + "plot_layers_header", "n_clicks_timestamp"),
+            Input(curr_plot + "ref_data_layers_header", "n_clicks_timestamp"),
+            Input(curr_plot + "user_data_layers_header", "n_clicks_timestamp"),
         ],
     )(generate_active_menu_tab_callback())
 
@@ -713,10 +782,16 @@ for curr_plot in plot_names:
 
     # Callback to hide/show MENU tab content
     app.callback(
-        Output(curr_plot + "plot_layers_tab", "style"), 
+        Output(curr_plot + "ref_data_layers_tab", "style"), 
         [Input(curr_plot + "menu_tab", "children")]
-    )(generate_plot_layers_content_tab_callback())
+    )(generate_ref_data_layers_content_tab_callback())
     
+    # Callback to hide/show MENU tab content
+    app.callback(
+        Output(curr_plot + "user_data_layers_tab", "style"), 
+        [Input(curr_plot + "menu_tab", "children")]
+    )(generate_user_data_layers_content_tab_callback())
+
     app.callback(
         [Output(curr_plot + "dropdown_plot_refdata", "options"),
          Output(curr_plot + "dropdown_plot_refdata", "value")],

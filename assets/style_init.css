@@ -385,14 +385,14 @@ body{
 
 .span-menu:hover, .selected{
   text-decoration: underline;
-  text-decoration-color: #58e3e8;
+  text-decoration-color: #55575D;
 }
 
 .table-orders{
   width: 100%;
   background-color: #22252b;
   color: #686868;
-/*   overflow-x: auto; */
+  overflow-x: auto;
 }
 
 .table-orders-empty{
@@ -598,13 +598,10 @@ div.Select-value, .Select-control,div.period, .Select-input{
 
 .dropdown-period{
   width: 100px;
-  font-size: 5px;
-
 }
 
 .dropdown-roi{
-  width: 100px;
-  font-size: 10px;
+  width: 150px;
 }
 
 .chart-top-bar{
@@ -767,7 +764,7 @@ summary {
 }
 
 .summary:hover, .summary-open{
-  background-color: #58e3e8;
+  background-color: #292B33;
   font-weight: bold;
   padding: .5em;
   cursor: pointer;
