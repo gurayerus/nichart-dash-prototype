@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import io
+import os
 import json
 import base64
 import datetime
@@ -12,297 +14,76 @@ import dash_core_components as dcc
 import dash_html_components as html
 import plotly.plotly as py
 import plotly.graph_objs as go
-
+from sklearn.linear_model import LinearRegression
+import base64
 from dash.dependencies import Input, Output, State
 from plotly import tools
-
+from utils_trace import *
 
 app = dash.Dash(
     __name__, meta_tags=[{"name": "viewport", "content": "width=device-width"}],
 )
-
 app.title = "NiChart"
-
 server = app.server
-
 PATH = pathlib.Path(__file__).parent
 DATA_PATH = PATH.joinpath("data").resolve()
 
+#####################################################
+## Hard coded parameters
+## FIXME : this part will be modified in final version
+NUM_PLOTS = 4
 
-# Loading roi data
-dsets_data = {
-    #"Dset1": pd.read_csv(DATA_PATH.joinpath("Dset1.csv"), index_col=1),
-    #"Dset2": pd.read_csv(DATA_PATH.joinpath("Dset2.csv"), index_col=1),
-    "Dset1": pd.read_csv(DATA_PATH.joinpath("Dset1_n100.csv"), index_col=1),
-    "Dset2": pd.read_csv(DATA_PATH.joinpath("Dset2_n100.csv"), index_col=1),
+## Initial reference data files
+##  csv files used as reference; users can upload additional ones
+dsets_ref = {
+    "Dset1": pd.read_csv(DATA_PATH.joinpath("Dset1.csv"), index_col=0).to_dict('records'),
 }
 
-# Currency dsets
-dsets = ["Dset1", "Dset2"]
+## Initial user data files
+##  csv files with user data; normally users will upload them
+dsets_user = {
+    "Dset2": pd.read_csv(DATA_PATH.joinpath("Dset2.csv"), index_col=0).to_dict('records'),
+    "Dset3": pd.read_csv(DATA_PATH.joinpath("Dset3.csv"), index_col=0).to_dict('records'),
+}
 
-# Display big numbers in readable format
-def human_format(num):
-    try:
-        num = float(num)
-        # If value is 0
-        if num == 0:
-            return 0
-        # Else value is a number
-        if num < 1000000:
-            return num
-        magnitude = int(math.log(num, 1000))
-        mantissa = str(int(num / (1000 ** magnitude)))
-        return mantissa + ["", "K", "M", "G", "T", "P"][magnitude]
-    except:
-        return num
+## Get ROI names
+tmp_col = pd.DataFrame.from_dict(list(dsets_ref.values())[0]).columns
+ROI_NAMES = tmp_col[tmp_col.str.contains('MUSE')].tolist()
+NON_ROI_COLS = tmp_col[tmp_col.str.contains('MUSE') == False].tolist()
 
+#####################################################
 
-# Returns Top cell bar for header area
-def get_top_bar_cell(cellTitle, cellValue):
-    return html.Div(
-        className="two-col",
-        children=[
-            html.P(className="p-top-bar", children=cellTitle),
-            html.P(id=cellTitle, className="display-none", children=cellValue),
-            html.P(children=human_format(cellValue)),
-        ],
-    )
+## List of plot names
+plot_names = ["Plot" + str(i+1) for i in range(NUM_PLOTS)]
 
-####### STUDIES TRACES ######
+#####################################################
+## Functions to create different parts of the dashboard
 
-# Moving average
-def moving_average_trace(df, fig):
-    df2 = df.rolling(window=5).mean()
-    trace = go.Scatter(
-        x=df2.index, y=df2["close"], mode="lines", showlegend=False, name="MA"
-    )
-    fig.append_trace(trace, 1, 1)  # plot in first row
-    return fig
+def create_plot(dset_ref, dset_user, 
+                type_trace, type_refdatalayer, type_userdatalayer, 
+                xvar, yvar):
+    ''' Create a figure for a single plot (generated using user selections)
+    '''
 
+    # Get data
+    if isinstance(dset_ref, pd.DataFrame) == False:
+        dset_ref = pd.DataFrame.from_dict(dset_ref)
 
-# Exponential moving average
-def e_moving_average_trace(df, fig):
-    df2 = df.rolling(window=20).mean()
-    trace = go.Scatter(
-        x=df2.index, y=df2["close"], mode="lines", showlegend=False, name="EMA"
-    )
-    fig.append_trace(trace, 1, 1)  # plot in first row
-    return fig
+    if isinstance(dset_user, pd.DataFrame) == False:
+        dset_user = pd.DataFrame.from_dict(dset_user)
 
+    sel_ref_data_layers = []
+    row = 1
+    if len(type_refdatalayer) > 0:
+        for sel_layer in type_refdatalayer:
+            sel_ref_data_layers.append(sel_layer)
 
-# Bollinger Bands
-def bollinger_trace(df, fig, window_size=10, num_of_std=5):
-    price = df["close"]
-    rolling_mean = price.rolling(window=window_size).mean()
-    rolling_std = price.rolling(window=window_size).std()
-    upper_band = rolling_mean + (rolling_std * num_of_std)
-    lower_band = rolling_mean - (rolling_std * num_of_std)
+    sel_user_data_layers = []
+    row = 1
 
-    trace = go.Scatter(
-        x=df.index, y=upper_band, mode="lines", showlegend=False, name="BB_upper"
-    )
-
-    trace2 = go.Scatter(
-        x=df.index, y=rolling_mean, mode="lines", showlegend=False, name="BB_mean"
-    )
-
-    trace3 = go.Scatter(
-        x=df.index, y=lower_band, mode="lines", showlegend=False, name="BB_lower"
-    )
-
-    fig.append_trace(trace, 1, 1)  # plot in first row
-    fig.append_trace(trace2, 1, 1)  # plot in first row
-    fig.append_trace(trace3, 1, 1)  # plot in first row
-    return fig
-
-
-# Accumulation Distribution
-def accumulation_trace(df):
-    df["volume"] = ((df["close"] - df["low"]) - (df["high"] - df["close"])) / (
-        df["high"] - df["low"]
-    )
-    trace = go.Scatter(
-        x=df.index, y=df["volume"], mode="lines", showlegend=False, name="Accumulation"
-    )
-    return trace
-
-
-# Commodity Channel Index
-def cci_trace(df, ndays=5):
-    TP = (df["high"] + df["low"] + df["close"]) / 3
-    CCI = pd.Series(
-        (TP - TP.rolling(window=10, center=False).mean())
-        / (0.015 * TP.rolling(window=10, center=False).std()),
-        name="cci",
-    )
-    trace = go.Scatter(x=df.index, y=CCI, mode="lines", showlegend=False, name="CCI")
-    return trace
-
-
-# Price Rate of Change
-def roc_trace(df, ndays=5):
-    N = df["close"].diff(ndays)
-    D = df["close"].shift(ndays)
-    ROC = pd.Series(N / D, name="roc")
-    trace = go.Scatter(x=df.index, y=ROC, mode="lines", showlegend=False, name="ROC")
-    return trace
-
-
-# Stochastic oscillator %K
-def stoc_trace(df):
-    SOk = pd.Series((df["close"] - df["low"]) / (df["high"] - df["low"]), name="SO%k")
-    trace = go.Scatter(x=df.index, y=SOk, mode="lines", showlegend=False, name="SO%k")
-    return trace
-
-
-# Momentum
-def mom_trace(df, n=5):
-    M = pd.Series(df["close"].diff(n), name="Momentum_" + str(n))
-    trace = go.Scatter(x=df.index, y=M, mode="lines", showlegend=False, name="MOM")
-    return trace
-
-
-# Pivot points
-def pp_trace(df, fig):
-    PP = pd.Series((df["high"] + df["low"] + df["close"]) / 3)
-    R1 = pd.Series(2 * PP - df["low"])
-    S1 = pd.Series(2 * PP - df["high"])
-    R2 = pd.Series(PP + df["high"] - df["low"])
-    S2 = pd.Series(PP - df["high"] + df["low"])
-    R3 = pd.Series(df["high"] + 2 * (PP - df["low"]))
-    S3 = pd.Series(df["low"] - 2 * (df["high"] - PP))
-    trace = go.Scatter(x=df.index, y=PP, mode="lines", showlegend=False, name="PP")
-    trace1 = go.Scatter(x=df.index, y=R1, mode="lines", showlegend=False, name="R1")
-    trace2 = go.Scatter(x=df.index, y=S1, mode="lines", showlegend=False, name="S1")
-    trace3 = go.Scatter(x=df.index, y=R2, mode="lines", showlegend=False, name="R2")
-    trace4 = go.Scatter(x=df.index, y=S2, mode="lines", showlegend=False, name="S2")
-    trace5 = go.Scatter(x=df.index, y=R3, mode="lines", showlegend=False, name="R3")
-    trace6 = go.Scatter(x=df.index, y=S3, mode="lines", showlegend=False, name="S3")
-    fig.append_trace(trace, 1, 1)
-    fig.append_trace(trace1, 1, 1)
-    fig.append_trace(trace2, 1, 1)
-    fig.append_trace(trace3, 1, 1)
-    fig.append_trace(trace4, 1, 1)
-    fig.append_trace(trace5, 1, 1)
-    fig.append_trace(trace6, 1, 1)
-    return fig
-
-
-# MAIN CHART TRACES (STYLE tab)
-def line_trace(df):
-    trace = go.Scatter(x = df['Age_At_Visit'], y = df["MUSE_GM"], mode="lines", showlegend=False, name="line")
-    return trace
-
-def area_trace(df):
-    trace = go.Scatter(
-        x=df.index, y=df["close"], showlegend=False, fill="toself", name="area"
-    )
-    return trace
-
-
-def bar_trace(df):
-    return go.Ohlc(
-        x=df.index,
-        open=df["open"],
-        high=df["high"],
-        low=df["low"],
-        close=df["close"],
-        increasing=dict(line=dict(color="#888888")),
-        decreasing=dict(line=dict(color="#888888")),
-        showlegend=False,
-        name="bar",
-    )
-
-
-def colored_bar_trace(df):
-    return go.Ohlc(
-        x=df.index,
-        open=df["open"],
-        high=df["high"],
-        low=df["low"],
-        close=df["close"],
-        showlegend=False,
-        name="colored bar",
-    )
-
-
-def candlestick_trace(df):
-    return go.Candlestick(
-        x=df.index,
-        open=df["open"],
-        high=df["high"],
-        low=df["low"],
-        close=df["close"],
-        increasing=dict(line=dict(color="#00ff00")),
-        decreasing=dict(line=dict(color="white")),
-        showlegend=False,
-        name="candlestick",
-    )
-
-
-# For buy/sell modal
-def ask_modal_trace(curr_dset, index):
-    df = roi_data[curr_dset].iloc[index - 10 : index]  # returns ten rows
-    return go.Scatter(x=df.index, y=df["Ask"], mode="lines", showlegend=False)
-
-
-# For buy/sell modal
-def bid_modal_trace(curr_dset, index):
-    df = roi_data[curr_dset].iloc[index - 10 : index]  # returns ten rows
-    return go.Scatter(x=df.index, y=df["Bid"], mode="lines", showlegend=False)
-
-
-# returns modal figure for a currency dset
-def get_modal_fig(curr_dset, index):
-    fig = tools.make_subplots(
-        rows=2, shared_xaxes=True, shared_yaxes=False, cols=1, print_grid=False
-    )
-
-    fig.append_trace(ask_modal_trace(curr_dset, index), 1, 1)
-    fig.append_trace(bid_modal_trace(curr_dset, index), 2, 1)
-
-    fig["layout"]["autosize"] = True
-    fig["layout"]["height"] = 375
-    fig["layout"]["margin"] = {"t": 5, "l": 50, "b": 0, "r": 5}
-    fig["layout"]["yaxis"]["showgrid"] = True
-    fig["layout"]["yaxis"]["gridcolor"] = "#3E3F40"
-    fig["layout"]["yaxis"]["gridwidth"] = 1
-    fig["layout"].update(paper_bgcolor="#21252C", plot_bgcolor="#21252C")
-
-    return fig
-
-
-# Returns graph figure
-def get_fig(curr_dset, ask, bid, type_trace, studies, period):
-    # Get OHLC data
-    data_frame = roi_data[curr_dset]
-    t = datetime.datetime.now()
-    data = data_frame.loc[
-        : t.strftime(
-            "2016-01-05 %H:%M:%S"
-        )  # all the data from the beginning until current time
-    ]
-    data_bid = data["Bid"]
-    df = data_bid.resample(period).ohlc()
-
-    subplot_traces = [  # first row traces
-        "accumulation_trace",
-        "cci_trace",
-        "roc_trace",
-        "stoc_trace",
-        "mom_trace",
-    ]
-    selected_subplots_studies = []
-    selected_first_row_studies = []
-    row = 1  # number of subplots
-
-    if studies:
-        for study in studies:
-            if study in subplot_traces:
-                row += 1  # increment number of rows only if the study needs a subplot
-                selected_subplots_studies.append(study)
-            else:
-                selected_first_row_studies.append(study)
+    if len(type_userdatalayer) > 0:
+        for sel_layer in type_userdatalayer:
+            sel_user_data_layers.append(sel_layer)
 
     fig = tools.make_subplots(
         rows=row,
@@ -314,17 +95,15 @@ def get_fig(curr_dset, ask, bid, type_trace, studies, period):
     )
 
     # Add main trace (style) to figure
-    fig.append_trace(eval(type_trace)(df), 1, 1)
+    fig.append_trace(eval(type_trace)(dset_user, xvar, yvar), 1, 1)
 
-    # Add trace(s) on fig's first row
-    for study in selected_first_row_studies:
-        fig = eval(study)(df, fig)
+    # Add ref layers 
+    for sel_layer in sel_ref_data_layers:
+        fig = eval(sel_layer)(dset_ref, xvar, yvar, fig)
 
-    row = 1
-    # Plot trace on new row
-    for study in selected_subplots_studies:
-        row += 1
-        fig.append_trace(eval(study)(df), row, 1)
+    # Add user data layers 
+    for sel_layer in sel_user_data_layers:
+        fig = eval(sel_layer)(dset_user, xvar, yvar, fig)
 
     fig["layout"][
         "uirevision"
@@ -333,7 +112,7 @@ def get_fig(curr_dset, ask, bid, type_trace, studies, period):
     fig["layout"]["autosize"] = True
     fig["layout"]["height"] = 400
     fig["layout"]["xaxis"]["rangeslider"]["visible"] = False
-    fig["layout"]["xaxis"]["tickformat"] = "%H:%M"
+    #fig["layout"]["xaxis"]["tickformat"] = "%H:%M"
     fig["layout"]["yaxis"]["showgrid"] = True
     fig["layout"]["yaxis"]["gridcolor"] = "#3E3F40"
     fig["layout"]["yaxis"]["gridwidth"] = 1
@@ -341,64 +120,70 @@ def get_fig(curr_dset, ask, bid, type_trace, studies, period):
 
     return fig
 
-
-# returns chart div
-def chart_div(dset):
+def create_div_plot(curr_plot):
+    ''' Returns html div for a single plot
+    '''
     return html.Div(
-        id=dset + "graph_div",
-        className="display-none",
+        id = curr_plot + "_graph_div",
+        
+        className="display-none",               ## This is used to make figure visible/non-visible
+        #className="chart-style six columns",
+        
         children=[
-            # Menu for Currency Graph
+            # Menu for the plot
             html.Div(
-                id=dset + "menu",
-                className="not_visible",
+                id = curr_plot + "menu",
+                #className="not_visible",
+                className="visible",                
                 children=[
                     # stores current menu tab
                     html.Div(
-                        id=dset + "menu_tab",
-                        children=["Studies"],
+                        id = curr_plot + "menu_tab",
+                        children=["LayersData"],
                         style={"display": "none"},
                     ),
                     html.Span(
                         "Style",
-                        id=dset + "style_header",
+                        id = curr_plot + "style_header",
                         className="span-menu",
                         n_clicks_timestamp=2,
                     ),
                     html.Span(
-                        "Studies",
-                        id=dset + "studies_header",
+                        "LayersRef",
+                        id = curr_plot + "ref_data_layers_header",
                         className="span-menu",
                         n_clicks_timestamp=1,
                     ),
-                    # Studies Checklist
+                    # LayersData Checklist
                     html.Div(
-                        id=dset + "studies_tab",
+                        id = curr_plot + "ref_data_layers_tab",
                         children=[
                             dcc.Checklist(
-                                id=dset + "studies",
+                                id = curr_plot + "ref_data_layers",
                                 options=[
-                                    {
-                                        "label": "Accumulation/D",
-                                        "value": "accumulation_trace",
-                                    },
-                                    {
-                                        "label": "Bollinger bands",
-                                        "value": "bollinger_trace",
-                                    },
-                                    {"label": "MA", "value": "moving_average_trace"},
-                                    {"label": "EMA", "value": "e_moving_average_trace"},
-                                    {"label": "CCI", "value": "cci_trace"},
-                                    {"label": "ROC", "value": "roc_trace"},
-                                    {"label": "Pivot points", "value": "pp_trace"},
-                                    {
-                                        "label": "Stochastic oscillator",
-                                        "value": "stoc_trace",
-                                    },
-                                    {
-                                        "label": "Momentum indicator",
-                                        "value": "mom_trace",
-                                    },
+                                    {"label": "Lin Reg", "value": "linreg_trace"},
+                                    {"label": "Lowess Reg", "value": "lowess_trace"},
+                                ],
+                                value=[],
+                            )
+                        ],
+                        style={"display": "none"},
+                    ),
+                    html.Span(
+                        "LayersData",
+                        id = curr_plot + "user_data_layers_header",
+                        className="span-menu",
+                        n_clicks_timestamp=1,
+                    ),
+                    # LayersData Checklist
+                    html.Div(
+                        id = curr_plot + "user_data_layers_tab",
+                        children=[
+                            dcc.Checklist(
+                                id = curr_plot + "user_data_layers",
+                                options=[
+                                    {"label": "Lin Reg", "value": "linreg_trace"},
+                                    {"label": "Lowess Reg", "value": "lowess_trace"},
                                 ],
                                 value=[],
                             )
@@ -407,24 +192,15 @@ def chart_div(dset):
                     ),
                     # Styles checklist
                     html.Div(
-                        id=dset + "style_tab",
+                        id = curr_plot + "style_tab",
                         children=[
                             dcc.RadioItems(
-                                id=dset + "chart_type",
+                                id=curr_plot + "plot_type",
                                 options=[
-                                    {
-                                        "label": "candlestick",
-                                        "value": "candlestick_trace",
-                                    },
-                                    {"label": "line", "value": "line_trace"},
-                                    {"label": "mountain", "value": "area_trace"},
+                                    {"label": "dots", "value": "dots_trace"},
                                     {"label": "bar", "value": "bar_trace"},
-                                    {
-                                        "label": "colored bar",
-                                        "value": "colored_bar_trace",
-                                    },
                                 ],
-                                value="colored_bar_trace",
+                                value="dots_trace",
                             )
                         ],
                     ),
@@ -435,9 +211,9 @@ def chart_div(dset):
                 className="row chart-top-bar",
                 children=[
                     html.Span(
-                        id=dset + "menu_button",
+                        id = curr_plot + "_menu_button",
                         className="inline-block chart-title",
-                        children=f"{dset} ☰",
+                        children=f"{curr_plot} ☰",
                         n_clicks=0,
                     ),
                     # Dropdown and close button float right
@@ -448,23 +224,59 @@ def chart_div(dset):
                                 className="inline-block",
                                 children=[
                                     dcc.Dropdown(
-                                        className="dropdown-period",
-                                        id=dset + "dropdown_period",
+                                        className="dropdown-roi",
+                                        id = curr_plot + "dropdown_plot_refdata",
+                                        clearable=False,
+                                        #placeholder="Reference Data",
+                                    )
+                                ],
+                            ),
+                            html.Div(
+                                className="inline-block",
+                                children=[
+                                    dcc.Dropdown(
+                                        className="dropdown-roi",
+                                        id = curr_plot + "dropdown_plot_userdata",
+                                        clearable=False,
+                                        #placeholder="User Data",
+                                    )
+                                ],
+                            ),
+                            html.Div(
+                                className="inline-block",
+                                children=[
+                                    dcc.Dropdown(
+                                        className="dropdown-roi",
+                                        id = curr_plot + "dropdown_xvar",
                                         options=[
-                                            {"label": "5 min", "value": "5Min"},
-                                            {"label": "15 min", "value": "15Min"},
-                                            {"label": "30 min", "value": "30Min"},
+                                            {'label': i, 'value': i} for i in NON_ROI_COLS
                                         ],
-                                        value="15Min",
+                                        value = NON_ROI_COLS[0],
+                                        placeholder="ROI",                                        
+                                        clearable=False,
+                                    )
+                                ],
+                            ),
+                            html.Div(
+                                className="inline-block",
+                                children=[
+                                    dcc.Dropdown(
+                                        className="dropdown-roi",
+                                        id = curr_plot + "dropdown_yvar",
+                                        options=[
+                                            {'label': i, 'value': i} for i in ROI_NAMES
+                                        ],
+                                        value = ROI_NAMES[0],
+                                        placeholder="ROI",                                        
                                         clearable=False,
                                     )
                                 ],
                             ),
                             html.Span(
-                                id=dset + "close",
-                                className="chart-close inline-block float-right",
-                                children="×",
-                                n_clicks=0,
+                                id = curr_plot + "_close",
+                                className = "chart-close inline-block float-right",
+                                children = "×",
+                                n_clicks = 0,
                             ),
                         ],
                     ),
@@ -473,7 +285,7 @@ def chart_div(dset):
             # Graph div
             html.Div(
                 dcc.Graph(
-                    id=dset + "chart",
+                    id = curr_plot + "chart",
                     className="chart-graph",
                     config={"displayModeBar": False, "scrollZoom": True},
                 )
@@ -481,279 +293,248 @@ def chart_div(dset):
         ],
     )
 
-
-# returns modal Buy/Sell
-def modal(dset):
-    return html.Div(
-        id=dset + "modal",
-        className="modal",
-        style={"display": "none"},
-        children=[
-            html.Div(
-                className="modal-content",
-                children=[
-                    html.Span(
-                        id=dset + "closeModal", className="modal-close", children="×"
-                    ),
-                    html.P(id="modal" + dset, children=dset),
-                    # row div with two div
-                    html.Div(
-                        className="row",
-                        children=[
-                            # graph div
-                            html.Div(
-                                className="six columns",
-                                children=[
-                                    dcc.Graph(
-                                        id=dset + "modal_graph",
-                                        config={"displayModeBar": False},
-                                    )
-                                ],
-                            ),
-                            # order values div
-                            html.Div(
-                                className="six columns modal-user-control",
-                                children=[
-                                    html.Div(
-                                        children=[
-                                            html.P("Volume"),
-                                            dcc.Input(
-                                                id=dset + "volume",
-                                                className="modal-input",
-                                                type="number",
-                                                value=0.1,
-                                                min=0,
-                                                step=0.1,
-                                            ),
-                                        ]
-                                    ),
-                                    html.Div(
-                                        children=[
-                                            html.P("Type"),
-                                            dcc.RadioItems(
-                                                id=dset + "trade_type",
-                                                options=[
-                                                    {"label": "Buy", "value": "buy"},
-                                                    {"label": "Sell", "value": "sell"},
-                                                ],
-                                                value="buy",
-                                                labelStyle={"display": "inline-block"},
-                                            ),
-                                        ]
-                                    ),
-                                    html.Div(
-                                        children=[
-                                            html.P("SL TPS"),
-                                            dcc.Input(
-                                                id=dset + "SL",
-                                                type="number",
-                                                min=0,
-                                                step=1,
-                                            ),
-                                        ]
-                                    ),
-                                    html.Div(
-                                        children=[
-                                            html.P("TP TPS"),
-                                            dcc.Input(
-                                                id=dset + "TP",
-                                                type="number",
-                                                min=0,
-                                                step=1,
-                                            ),
-                                        ]
-                                    ),
-                                ],
-                            ),
-                        ],
-                    ),
-                    html.Div(
-                        className="modal-order-btn",
-                        children=html.Button(
-                            "Order", id=dset + "button_order", n_clicks=0
-                        ),
-                    ),
-                ],
-            )
-        ],
-    )
-
-
 # Dash App Layout
 app.layout = html.Div(
     className="row",
     children=[
-        # Interval component for live clock
-        dcc.Interval(id="interval", interval=1 * 1000, n_intervals=0),
-        # Interval component for ask bid updates
-        dcc.Interval(id="i_bis", interval=1 * 2000, n_intervals=0),
-        # Interval component for graph updates
-        dcc.Interval(id="i_tris", interval=1 * 5000, n_intervals=0),
-        # Interval component for graph updates
-        dcc.Interval(id="i_news", interval=1 * 60000, n_intervals=0),
+
         # Left Panel Div
         html.Div(
             className="three columns div-left-panel",
             children=[
+
                 # Div for Left Panel App Info
                 html.Div(
                     className="div-info",
                     children=[
+                        html.H2(className="title-header", children="NiChart"),
                         html.A(
                             html.Img(
                                 className="logo",
-                                src=app.get_asset_url("dash-logo-new.png"),
+                                src=app.get_asset_url("nichart_logo_v1.png"),
                             ),
-                            href="https://plotly.com/dash/",
-                        ),
-                        html.H6(className="title-header", children="NiChart"),
-                        dcc.Markdown(
-                            """
-                            NiChart
-                            """
+                            href="https://www.med.upenn.edu/cbica/nichart/",
                         ),
                     ],
                 ),
-                # Ask Bid Currency Div
-                html.Div(
-                    className="div-currency-toggles",
-                    children=[
-                        html.P(
-                            id="live_clock",
-                            className="three-col",
-                            children=datetime.datetime.now().strftime("%H:%M:%S"),
-                        ),
-                        html.P(className="three-col", children="GMPlot"),
-                        html.P(className="three-col", children="WMPlot"),
-                        html.Div(
-                            id="dsets",
-                            className="div-bid-ask",
-                            children=[
-                                get_row(first_ask_bid(dset, datetime.datetime.now()))
-                                for dset in dsets
-                            ],
-                        ),
-                    ],
-                ),
+
+                # Div for uploading reference data file(s)
+                html.Div([
+                    html.Div('Upload reference data file(s) (csv): ', 
+                             style={'color': 'yellow', 'fontSize': 14}),
+                    dcc.Upload(
+                        id='upload_data_ref',
+                        children=html.Div([
+                            'Drag and Drop or ',
+                            html.A('Select Files')
+                        ]),
+                        style={
+                            'width': '100%',
+                            'height': '60px',
+                            'lineHeight': '60px',
+                            'borderWidth': '1px',
+                            'borderStyle': 'dashed',
+                            'borderRadius': '5px',
+                            'textAlign': 'center',
+                            'margin': '10px'
+                        },
+                        # Allow multiple files to be uploaded
+                        multiple=True
+                    ),
+                    dcc.Store(id = 'store_data_ref', data = dsets_ref),
+                ]),
+
+                # Div for uploading user data file(s)
+                html.Div([
+                    html.Div('Upload user data file(s) (csv): ', 
+                             style={'color': 'yellow', 'fontSize': 14}),
+                    dcc.Upload(
+                        id='upload_data_user',
+                        children=html.Div([
+                            'Drag and Drop or ',
+                            html.A('Select Files')
+                        ]),
+                        style={
+                            'width': '100%',
+                            'height': '60px',
+                            'lineHeight': '60px',
+                            'borderWidth': '1px',
+                            'borderStyle': 'dashed',
+                            'borderRadius': '5px',
+                            'textAlign': 'center',
+                            'margin': '10px'
+                        },
+                        # Allow multiple files to be uploaded
+                        multiple=True
+                    ),
+                    dcc.Store(id = 'store_data_user', data = dsets_user),
+                ]),
+
+                # Div for showing ref data files info
+                html.Div([
+                    html.Div('Reference data info: ', style={'color': 'red', 'fontSize': 14}),
+
+                    # Dropdown file list
+                    html.Div(
+                        className="graph-top-right inline-block",
+                        children=[
+                            html.Div(
+                                className="inline-block",
+                                children=[
+                                    dcc.Dropdown(
+                                        className="dropdown-roi",
+                                        id = "dropdown_data_ref",
+                                        options=[
+                                            {'label': i, 'value': i} for i in list(dsets_ref.keys())
+                                        ],
+                                        value = list(dsets_ref.keys())[0],
+                                        clearable=False,
+                                    )
+                                ],
+                            ),
+                        ],
+                    ),
+                                        
+                    ### FIXME
+                    dcc.Textarea(value = 'TODO: Add here info about selected ref df', 
+                                 className='my-class', 
+                                 id='text_ref_df'
+                                ),
+                ]),
+                                        
+                # Div for showing user data files info
+                html.Div([
+                    html.Div('User data info: ', style={'color': 'red', 'fontSize': 14}),
+
+                    # Dropdown file list
+                    html.Div(
+                        className="graph-top-right inline-block",
+                        children=[
+                            html.Div(
+                                className="inline-block",
+                                children=[
+                                    dcc.Dropdown(
+                                        className="dropdown-roi",
+                                        id = "dropdown_data_user",
+                                        options=[
+                                            {'label': i, 'value': i} for i in list(dsets_user.keys())
+                                        ],
+                                        value = list(dsets_user.keys())[0],
+                                        clearable=False,
+                                    )
+                                ],
+                            ),
+                        ],
+                    ),
+                                        
+                    ### FIXME
+                    dcc.Textarea(value = 'TODO: Add here info about selected user df', 
+                                 className='my-class', 
+                                 id='text_user_df'
+                                ),
+                ]),
+                 
+                # Div for new plot button
+                html.Div([
+                    html.Button(
+                        id = "new_plot_button",
+                        children = "New Plot",
+                        n_clicks = 0,
+                    )
+                ]),
             ],
+                    
         ),
-        # Right Panel Div
+
+        # Right Panel Div with plots
         html.Div(
             className="nine columns div-right-panel",
             children=[
-                # Top Bar Div - Displays Balance, Equity, ... , Open P/L
-                html.Div(
-                    id="top_bar", className="row div-top-bar", children=get_top_bar()
-                ),
+
                 # Charts Div
                 html.Div(
                     id="charts",
                     className="row",
-                    children=[chart_div(dset) for dset in dsets],
-                ),
-                # Panel for orders
-                html.Div(
-                    id="bottom_panel",
-                    className="row div-bottom-panel",
-                    children=[
-                        html.Div(
-                            className="display-inlineblock",
-                            children=[
-                                dcc.Dropdown(
-                                    id="dropdown_positions",
-                                    className="bottom-dropdown",
-                                    options=[
-                                        {"label": "Open Positions", "value": "open"},
-                                        {
-                                            "label": "Closed Positions",
-                                            "value": "closed",
-                                        },
-                                    ],
-                                    value="open",
-                                    clearable=False,
-                                    style={"border": "0px solid black"},
-                                )
-                            ],
-                        ),
-                        html.Div(
-                            className="display-inlineblock float-right",
-                            children=[
-                                dcc.Dropdown(
-                                    id="closable_orders",
-                                    className="bottom-dropdown",
-                                    placeholder="Close order",
-                                )
-                            ],
-                        ),
-                        html.Div(id="orders_table", className="row table-orders"),
-                    ],
+                    children=[create_div_plot(curr_plot) for curr_plot in plot_names],
                 ),
             ],
         ),
-        # Hidden div that stores all clicked charts (EURUSD, USDCHF, etc.)
-        html.Div(id="charts_clicked", style={"display": "none"}),
-        # Hidden div for each dset that stores orders
-        html.Div(
-            children=[
-                html.Div(id=dset + "orders", style={"display": "none"})
-                for dset in dsets
-            ]
-        ),
-        html.Div([modal(dset) for dset in dsets]),
-        # Hidden Div that stores all orders
-        html.Div(id="orders", style={"display": "none"}),
+
+        # Hidden div that stores all clicked plots
+        html.Div(id="plots_visible_arr", children = ['Plot1'], style={"display": "none"}),
+
+        ## Hidden div that stores all clicked plots
+        #html.Div(id="plots_visible_arr", children = [], style={"display": "none"}),
+        
     ],
 )
 
+##########################################################################
 # Dynamic Callbacks
+##########################################################################
 
-# returns string containing clicked charts
-def generate_chart_button_callback():
-    def chart_button_callback(*args):
-        dsets = ""
-        for i in range(len(currencies)):
-            if args[i] > 0:
-                dset = currencies[i]
-                if dsets:
-                    dsets = dsets + "," + dset
-                else:
-                    dsets = dset
-        return dsets
+# Updates if plots are visible/non-visible (returns a list of active plots)
+def generate_change_plot_vis_callback():
+    def change_plot_vis_callback(*args):
 
-    return chart_button_callback
+        changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
+        vis_arr = args[-1]
 
-# Function to update Graph Figure
-def generate_figure_callback(dset):
-    def chart_fig_callback(n_i, p, t, s, dsets, a, b, old_fig):
+        ## Add new plot
+        if 'new_plot_button' in changed_id:
+            for tmp_plot in plot_names:
+                if tmp_plot not in vis_arr:
+                    vis_arr = vis_arr + [tmp_plot]
+                    return vis_arr
+                    
+        ## Delete plot
+        #for i in range(1, len(plot_names)+1):
+        for i in range(0, len(plot_names)):
+            curr_plot = plot_names[i]
+            if curr_plot + "_close" in changed_id:
+                vis_arr = [x for x in vis_arr if x != curr_plot]
+        return vis_arr
+            
+    return change_plot_vis_callback
 
-        if dsets is None:
+# Function to update plot figure
+def generate_figure_callback(curr_plot):
+    def chart_fig_callback(plot_type, ref_data_layers, user_data_layers, 
+                           sel_ref_df, sel_user_df, 
+                           sel_xvar, sel_yvar, 
+                           data_store_ref, data_store_user):
+        
+        fig = tools.make_subplots(
+            rows=1,
+            shared_xaxes=True,
+            shared_yaxes=True,
+            cols=1,
+            print_grid=False,
+            vertical_spacing=0.12,
+        )
+        
+        if sel_ref_df is None:
+            return fig
+        
+        if sel_user_df is None:
+            return fig
+        
+        
+        curr_ref_dset = pd.DataFrame.from_dict(data_store_ref[sel_ref_df])
+        curr_user_dset = pd.DataFrame.from_dict(data_store_user[sel_user_df])
+        
+        if curr_ref_dset is None:
             return {"layout": {}, "data": {}}
 
-        dsets = dsets.split(",")
-        if dset not in dsets:
-            return {"layout": {}, "data": []}
-
-        if old_fig is None or old_fig == {"layout": {}, "data": {}}:
-            return get_fig(dset, a, b, t, s, p)
-
-        fig = get_fig(dset, a, b, t, s, p)
+        fig = create_plot(curr_ref_dset, curr_user_dset, 
+                          plot_type, ref_data_layers, user_data_layers, 
+                          sel_xvar, sel_yvar)
         return fig
 
     return chart_fig_callback
 
 
-# Function to close currency dset graph
-def generate_close_graph_callback():
-    def close_callback(n, n2):
-        if n == 0:
-            if n2 == 1:
-                return 1
-            return 0
-        return 0
-
-    return close_callback
-
-# Function to open or close STYLE or STUDIES menu
+# Function to open or close Style or LayersData menus
 def generate_open_close_menu_callback():
     def open_close_menu(n, className):
         if n == 0:
@@ -766,24 +547,37 @@ def generate_open_close_menu_callback():
     return open_close_menu
 
 # Function for hidden div that stores the last clicked menu tab
-# Also updates style and studies menu headers
+# Also updates style and user_data_layers menu headers
 def generate_active_menu_tab_callback():
-    def update_current_tab_name(n_style, n_studies):
-        if n_style >= n_studies:
-            return "Style", "span-menu selected", "span-menu"
-        return "Studies", "span-menu", "span-menu selected"
+    def update_current_tab_name(n_style, n_ref_data_layers, n_user_data_layers):
+        if n_style == np.max([n_style, n_ref_data_layers, n_user_data_layers]):
+            return "Style", "span-menu selected", "span-menu", "span-menu"
+        else:
+            if n_ref_data_layers == np.max([n_style, n_ref_data_layers, n_user_data_layers]):
+                return "LayersRef", "span-menu", "span-menu selected","span-menu"
+        return "LayersData", "span-menu", "span-menu", "span-menu selected"
 
     return update_current_tab_name
 
-# Function show or hide studies menu for chart
-def generate_studies_content_tab_callback():
-    def studies_tab(current_tab):
-        if current_tab == "Studies":
+
+# Function show or hide user_data_layers menu for chart
+def generate_user_data_layers_content_tab_callback():
+    def user_data_layers_content_tab_callback(current_tab):
+        if current_tab == "LayersData":
             return {"display": "block", "textAlign": "left", "marginTop": "30"}
         return {"display": "none"}
 
-    return studies_tab
+    return user_data_layers_content_tab_callback
 
+# Function show or hide ref_data_layers menu for chart
+def generate_ref_data_layers_content_tab_callback():
+    def ref_data_layers_content_tab_callback(current_tab):
+        
+        if current_tab == "LayersRef":
+            return {"display": "block", "textAlign": "left", "marginTop": "30"}
+        return {"display": "none"}
+
+    return ref_data_layers_content_tab_callback
 
 # Function show or hide style menu for chart
 def generate_style_content_tab_callback():
@@ -794,325 +588,217 @@ def generate_style_content_tab_callback():
 
     return style_tab
 
-
-# Open Modal
-def generate_modal_open_callback():
-    def open_modal(n):
-        if n > 0:
-            return {"display": "block"}
-        else:
-            return {"display": "none"}
-
-    return open_modal
-
-
-# Function to close modal
-def generate_modal_close_callback():
-    def close_modal(n, n2):
-        return 0
-
-    return close_modal
-
-
-# Function for modal graph - set modal SL value to none
-def generate_clean_sl_callback():
-    def clean_sl(n):
-        return 0
-
-    return clean_sl
-
-
-# Function for modal graph - set modal SL value to none
-def generate_clean_tp_callback():
-    def clean_tp(n):
-        return 0
-
-    return clean_tp
-
-
-# Function to create figure for Buy/Sell Modal
-def generate_modal_figure_callback(dset):
-    def figure_modal(index, n, old_fig):
-        if (n == 0 and old_fig is None) or n == 1:
-            return get_modal_fig(dset, index)
-        return old_fig  # avoid to compute new figure when the modal is hidden
-
-    return figure_modal
-
-
-# Function updates the dset orders div
-def generate_order_button_callback(dset):
-    def order_callback(n, vol, type_order, sl, tp, dset_orders, ask, bid):
-        if n > 0:
-            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            l = [] if dset_orders is None else json.loads(dset_orders)
-            price = bid if type_order == "sell" else ask
-
-            if tp != 0:
-                tp = (
-                    price + tp * 0.001
-                    if tp != 0 and dset[3:] == "JPY"
-                    else price + tp * 0.00001
-                )
-
-            if sl != 0:
-                sl = price - sl * 0.001 if dset[3:] == "JPY" else price + sl * 0.00001
-
-            order = {
-                "id": dset + str(len(l)),
-                "time": t,
-                "type": type_order,
-                "volume": vol,
-                "symbol": dset,
-                "tp": tp,
-                "sl": sl,
-                "price": price,
-                "profit": 0.00,
-                "status": "open",
-            }
-            l.append(order)
-
-            return json.dumps(l)
-
-        return json.dumps([])
-
-    return order_callback
-
-
-# Function to update orders
-def update_orders(orders, current_bids, current_asks, id_to_close):
-    for order in orders:
-        if order["status"] == "open":
-            type_order = order["type"]
-            current_bid = current_bids[currencies.index(order["symbol"])]
-            current_ask = current_asks[currencies.index(order["symbol"])]
-
-            profit = (
-                order["volume"]
-                * 100000
-                * ((current_bid - order["price"]) / order["price"])
-                if type_order == "buy"
-                else (
-                    order["volume"]
-                    * 100000
-                    * ((order["price"] - current_ask) / order["price"])
-                )
-            )
-
-            order["profit"] = "%.2f" % profit
-            price = current_bid if order["type"] == "buy" else current_ask
-
-            if order["id"] == id_to_close:
-                order["status"] = "closed"
-                order["close Time"] = datetime.datetime.now().strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                )
-                order["close Price"] = price
-
-            if order["tp"] != 0 and price >= order["tp"]:
-                order["status"] = "closed"
-                order["close Time"] = datetime.datetime.now().strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                )
-                order["close Price"] = price
-
-            if order["sl"] != 0 and order["sl"] >= price:
-                order["status"] = "closed"
-                order["close Time"] = datetime.datetime.now().strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                )
-                order["close Price"] = price
-    return orders
-
-
-# Function to update orders div
-def generate_update_orders_div_callback():
-    def update_orders_callback(*args):
-        orders = []
-        current_orders = args[-1]
-        close_id = args[-2]
-        args = args[:-2]  # contains list of orders for each dset + asks + bids
-        len_args = len(args)
-        current_bids = args[len_args // 3 : 2 * len_args]
-        current_asks = args[2 * len_args // 3 : len_args]
-        args = args[: len_args // 3]
-        ids = []
-
-        if current_orders is not None:
-            orders = json.loads(current_orders)
-            for order in orders:
-                ids.append(
-                    order["id"]  # ids that allready have been added to current orders
-                )
-
-        for list_order in args:  # each currency dset has its list of orders
-            if list_order != "[]":
-                list_order = json.loads(list_order)
-                for order in list_order:
-                    if order["id"] not in ids:  # only add new orders
-                        orders.append(order)
-        if len(orders) == 0:
-            return None
-
-        # we update status and profit of orders
-        orders = update_orders(orders, current_bids, current_asks, close_id)
-        return json.dumps(orders)
-
-    return update_orders_callback
-
-
-# Resize dset div according to the number of charts displayed
-def generate_show_hide_graph_div_callback(dset):
-    def show_graph_div_callback(charts_clicked):
-        if dset not in charts_clicked:
+# Resize plotting div according to the number of plots displayed
+def generate_plot_set_visibility_callback(curr_plot):
+    def plot_set_visibility_callback(plots_visible_arr):
+        if curr_plot not in plots_visible_arr:
             return "display-none"
-
-        charts_clicked = charts_clicked.split(",")  # [:4] max of 4 graph
-        len_list = len(charts_clicked)
-
+        len_vis_plots = len(plots_visible_arr)
         classes = "chart-style"
-        if len_list % 2 == 0:
+        if len_vis_plots % 2 == 0:
             classes = classes + " six columns"
-        elif len_list == 3:
+        elif len_vis_plots == 3:
             classes = classes + " four columns"
         else:
             classes = classes + " twelve columns"
         return classes
+    return plot_set_visibility_callback
 
-    return show_graph_div_callback
-
-
-# Generate Buy/Sell and Chart Buttons for Left Panel
-def generate_contents_for_left_panel():
-    def show_contents(n_clicks):
-        if n_clicks is None:
-            return "display-none", "row summary"
-        elif n_clicks % 2 == 0:
-            return "display-none", "row summary"
-        return "row details", "row summary-open"
-
-    return show_contents
+def generate_uploaded_dfs_callback():
+    def uploaded_dfs_callback(dict_dfs):
+        dict_options =  [{'label': i, 'value': i} for i in dict_dfs.keys()]
+        sel_val = list(dict_dfs.keys())[0]
+        return dict_options, sel_val
+    return uploaded_dfs_callback
 
 
-# Loop through all currencies
-for dset in dsets:
 
-    # Callback to update the actual graph
+#######################################################
+# Updates if a plot is visible/non-visible
+# - "new plot button" clicked: make the first non-visible plot visible
+# - "delete button" (x) on a plot is clicked: make the plot non-visible
+app.callback(
+    Output("plots_visible_arr", "children"), 
+    [Input("new_plot_button", "n_clicks")] + 
+    [Input(curr_plot + "_close", "n_clicks") for curr_plot in plot_names],
+    [State("plots_visible_arr", "children")], 
+)(generate_change_plot_vis_callback())
+#######################################################
+
+
+#######################################################
+# Upload data files
+### Read uploaded dfs
+def parse_contents(contents, filename):
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    try:
+        if 'csv' in filename:
+            # Assume that the user uploaded a CSV file
+            df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+            
+    except Exception as e:
+        return None
+
+    df = df.to_dict(orient='records')
+    return df
+
+## Upload files
+def generate_upload_data_callback():
+    def upload_data_callback(list_of_names, list_of_contents, store_data):
+        ## Initialize empty dictionary for the storage
+        if store_data is None:
+            store_data = {}
+        
+        ## Read data files
+        dfs = []
+        if list_of_contents is not None:
+            dfs = [parse_contents(c, n) for c, n in zip(list_of_contents, list_of_names)]
+
+        ## Add dfs to storage
+        for i, tmp_df in enumerate(dfs):
+            if tmp_df is not None:                
+                tmp_name = list_of_names[i]
+                if tmp_name in store_data.keys():
+                    print('Warning: file already in storage, skipping !')
+                else:
+                    store_data[tmp_name] = tmp_df
+        
+        ## Return stored data
+        return store_data
+    return upload_data_callback
+        
+app.callback(
+    Output("store_data_ref", "data"),
+    [
+        Input("upload_data_ref", "filename"),
+        Input("upload_data_ref", "contents"),
+    ],
+    [
+        State("store_data_ref", "data"),
+    ],
+)(generate_upload_data_callback())
+
+app.callback(
+    Output("store_data_user", "data"),
+    [
+        Input("upload_data_user", "filename"),
+        Input("upload_data_user", "contents"),
+    ],
+    [
+        State("store_data_user", "data"),
+    ],
+)(generate_upload_data_callback())
+#######################################################
+
+
+#######################################################
+## Update dropdown lists (based on data stored for reference data files and user data files)
+app.callback(
+    [Output("dropdown_data_ref", "options"),
+     Output("dropdown_data_ref", "value")],
+    [
+        Input("store_data_ref", "data"),
+    ],
+)(generate_uploaded_dfs_callback())
+
+app.callback(
+    [Output("dropdown_data_user", "options"),
+     Output("dropdown_data_user", "value")],
+    [
+        Input("store_data_user", "data"),
+    ],
+)(generate_uploaded_dfs_callback())
+#######################################################
+
+
+######################################################
+# Loop through all plots
+for curr_plot in plot_names:
+    
+    ## Callback to make plot visible/invisible
+    ## - This is done by modifying the className property of the plot
+    ## - className sets the style to display the plot and is defined in the css  
     app.callback(
-        Output(dset + "chart", "figure"),
+        Output(curr_plot + "_graph_div", "className"), 
+        [Input("plots_visible_arr", "children")]
+    )(generate_plot_set_visibility_callback(curr_plot))
+    
+    # Callback to update the plot drawing
+    app.callback(
+        Output(curr_plot + "chart", "figure"),
         [
-            Input("i_tris", "n_intervals"),
-            Input(dset + "dropdown_period", "value"),
-            Input(dset + "chart_type", "value"),
-            Input(dset + "studies", "value"),
-            Input("charts_clicked", "children"),
+            Input(curr_plot + "plot_type", "value"),
+            Input(curr_plot + "ref_data_layers", "value"),            
+            Input(curr_plot + "user_data_layers", "value"),            
+            Input(curr_plot + "dropdown_plot_refdata", "value"),
+            Input(curr_plot + "dropdown_plot_userdata", "value"),
+            Input(curr_plot + "dropdown_xvar", "value"),
+            Input(curr_plot + "dropdown_yvar", "value"),
         ],
         [
-            State(dset + "ask", "children"),
-            State(dset + "bid", "children"),
-            State(dset + "chart", "figure"),
+            State('store_data_ref', 'data'),            
+            State('store_data_user', 'data'),            
         ],
-    )(generate_figure_callback(dset))
+    )(generate_figure_callback(curr_plot))
 
-    # updates the ask and bid prices
+    # Show or hide graph menu
     app.callback(
-        Output(dset + "row", "children"),
-        [Input("i_bis", "n_intervals")],
-        [
-            State(dset + "index", "children"),
-            State(dset + "bid", "children"),
-            State(dset + "ask", "children"),
-        ],
-    )(generate_ask_bid_row_callback(dset))
-
-    # close graph by setting to 0 n_clicks property
-    app.callback(
-        Output(dset + "Button_chart", "n_clicks"),
-        [Input(dset + "close", "n_clicks")],
-        [State(dset + "Button_chart", "n_clicks")],
-    )(generate_close_graph_callback())
-
-    # show or hide graph menu
-    app.callback(
-        Output(dset + "menu", "className"),
-        [Input(dset + "menu_button", "n_clicks")],
-        [State(dset + "menu", "className")],
+        Output(curr_plot + "menu", "className"),
+        [Input(curr_plot + "_menu_button", "n_clicks")],
+        [State(curr_plot + "menu", "className")],
     )(generate_open_close_menu_callback())
 
-    # stores in hidden div name of clicked tab name
+    # Callback to update menu and header visibility for a plot
     app.callback(
         [
-            Output(dset + "menu_tab", "children"),
-            Output(dset + "style_header", "className"),
-            Output(dset + "studies_header", "className"),
+            Output(curr_plot + "menu_tab", "children"),
+            Output(curr_plot + "style_header", "className"),
+            Output(curr_plot + "ref_data_layers_header", "className"),
+            Output(curr_plot + "user_data_layers_header", "className"),
         ],
         [
-            Input(dset + "style_header", "n_clicks_timestamp"),
-            Input(dset + "studies_header", "n_clicks_timestamp"),
+            Input(curr_plot + "style_header", "n_clicks_timestamp"),
+            Input(curr_plot + "ref_data_layers_header", "n_clicks_timestamp"),
+            Input(curr_plot + "user_data_layers_header", "n_clicks_timestamp"),
         ],
     )(generate_active_menu_tab_callback())
 
-    # hide/show STYLE tab content if clicked or not
+    # Callback to hide/show STYLE tab content
     app.callback(
-        Output(dset + "style_tab", "style"), [Input(dset + "menu_tab", "children")]
+        Output(curr_plot + "style_tab", "style"),
+        [Input(curr_plot + "menu_tab", "children")]
     )(generate_style_content_tab_callback())
 
-    # hide/show MENU tab content if clicked or not
+    # Callback to hide/show MENU tab content
     app.callback(
-        Output(dset + "studies_tab", "style"), [Input(dset + "menu_tab", "children")]
-    )(generate_studies_content_tab_callback())
-
-    # show modal
-    app.callback(Output(dset + "modal", "style"), [Input(dset + "Buy", "n_clicks")])(
-        generate_modal_open_callback()
-    )
-
-    # set modal value SL to O
-    app.callback(Output(dset + "SL", "value"), [Input(dset + "Buy", "n_clicks")])(
-        generate_clean_sl_callback()
-    )
-
-    # set modal value TP to O
-    app.callback(Output(dset + "TP", "value"), [Input(dset + "Buy", "n_clicks")])(
-        generate_clean_tp_callback()
-    )
-
-    # hide modal
+        Output(curr_plot + "ref_data_layers_tab", "style"), 
+        [Input(curr_plot + "menu_tab", "children")]
+    )(generate_ref_data_layers_content_tab_callback())
+    
+    # Callback to hide/show MENU tab content
     app.callback(
-        Output(dset + "Buy", "n_clicks"),
+        Output(curr_plot + "user_data_layers_tab", "style"), 
+        [Input(curr_plot + "menu_tab", "children")]
+    )(generate_user_data_layers_content_tab_callback())
+
+    app.callback(
+        [Output(curr_plot + "dropdown_plot_refdata", "options"),
+         Output(curr_plot + "dropdown_plot_refdata", "value")],
         [
-            Input(dset + "closeModal", "n_clicks"),
-            Input(dset + "button_order", "n_clicks"),
+            Input("store_data_ref", "data"),
         ],
-    )(generate_modal_close_callback())
+    )(generate_uploaded_dfs_callback())
 
-    # updates modal figure
     app.callback(
-        Output(dset + "modal_graph", "figure"),
-        [Input(dset + "index", "children"), Input(dset + "Buy", "n_clicks")],
-        [State(dset + "modal_graph", "figure")],
-    )(generate_modal_figure_callback(dset))
-
-    # each dset saves its orders in hidden div
-    app.callback(
-        Output(dset + "orders", "children"),
-        [Input(dset + "button_order", "n_clicks")],
+        [Output(curr_plot + "dropdown_plot_userdata", "options"),
+         Output(curr_plot + "dropdown_plot_userdata", "value")],
         [
-            State(dset + "volume", "value"),
-            State(dset + "trade_type", "value"),
-            State(dset + "SL", "value"),
-            State(dset + "TP", "value"),
-            State(dset + "orders", "children"),
-            State(dset + "ask", "children"),
-            State(dset + "bid", "children"),
+            Input("store_data_user", "data"),
         ],
-    )(generate_order_button_callback(dset))
-
-# Callback to update live clock
-@app.callback(Output("live_clock", "children"), [Input("interval", "n_intervals")])
-def update_time(n):
-    return datetime.datetime.now().strftime("%H:%M:%S")
-
+    )(generate_uploaded_dfs_callback())
+    
+######################################################
 
 if __name__ == "__main__":
     app.run_server(debug=True)
