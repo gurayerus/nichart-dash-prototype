@@ -6,7 +6,7 @@ Dash interactive dashboard for NiChart
 ```
 git clone nichart-dash
 cd nichart-dash
-conda create -n nichart-dash python=3.7.6
+conda create -n nichart-dash python=3.10
 conda activate nichart-dash
 pip install -r requirements.txt
 python app.py
