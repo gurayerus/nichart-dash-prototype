@@ -26,7 +26,8 @@ app = dash.Dash(
 app.title = "NiChart"
 server = app.server
 PATH = pathlib.Path(__file__).parent
-DATA_PATH = PATH.joinpath("data", "csv_data").resolve()
+DATA_PATH1 = PATH.joinpath("data", "csv_data").resolve()
+DATA_PATH2 = PATH.joinpath("data", "reference_data", 'CENTILES').resolve()
 
 #####################################################
 ## Hard coded parameters
@@ -36,18 +37,18 @@ NUM_PLOTS = 4
 ## Initial reference data files
 ##  csv files used as reference; users can upload additional ones
 dsets_ref = {
-    "Dset1": pd.read_csv(DATA_PATH.joinpath("Dset1.csv"), index_col=0).to_dict('records'),
+    "Dset1": pd.read_csv(DATA_PATH2.joinpath("ISTAGING_Age_SelROIS_Centiles_ROI_601.csv")).to_dict('records'),
 }
 
 ## Initial user data files
 ##  csv files with user data; normally users will upload them
 dsets_user = {
-    "Dset2": pd.read_csv(DATA_PATH.joinpath("Dset2.csv"), index_col=0).to_dict('records'),
-    "Dset3": pd.read_csv(DATA_PATH.joinpath("Dset3.csv"), index_col=0).to_dict('records'),
+    "Dset2": pd.read_csv(DATA_PATH1.joinpath("Dset2.csv"), index_col=0).to_dict('records'),
+    "Dset3": pd.read_csv(DATA_PATH1.joinpath("Dset3.csv"), index_col=0).to_dict('records'),
 }
 
 ## Get ROI names
-tmp_col = pd.DataFrame.from_dict(list(dsets_ref.values())[0]).columns
+tmp_col = pd.DataFrame.from_dict(list(dsets_user.values())[0]).columns
 ROI_NAMES = tmp_col[tmp_col.str.contains('MUSE')].tolist()
 NON_ROI_COLS = tmp_col[tmp_col.str.contains('MUSE') == False].tolist()
 

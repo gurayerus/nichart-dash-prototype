@@ -11,29 +11,40 @@ import numpy as np
 ####### Plot types ######
 
 
-def percentile_trace(df, xvar, yvar):
+def percentile_trace(df, xvar, yvar, fig):
+    
+    
+    ### https://stackoverflow.com/questions/64741015/plotly-how-to-color-the-fill-between-two-lines-based-on-a-condition
     
     #trace = go.Scatter(
         #x=df[xvar], y=df[yvar], showlegend=False, mode = 'markers', name = "datapoint"
     #)
     ##return trace
 
+
+    #print('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
+    #print(df.columns)
+
+    xvar = 'Age'
+
     yvar1 = 'centile_25'
     yvar2 = 'centile_75'
 
     # Create line traces
-    trace1 = go.Scatter(x=xvar, y=yvar1, mode='lines', name='Line 1')
-    trace2 = go.Scatter(x=xvar, y=yvar2, mode='lines', name='Line 2')
+    trace1 = go.Scatter(x = df[xvar], y = df[yvar1], mode='lines', name='Line 1')
+    trace2 = go.Scatter(x = df[xvar], y = df[yvar2], mode='lines', name='Line 2', fill = 'tonexty')
 
-    # Create trace for filling between lines
-    fill_trace = go.Scatter(x = xvar + xvar[::-1], 
-                            y=yvar1 + yvar2[::-1], 
-                            fill='tozerox', 
-                            fillcolor='rgba(0, 176, 246, 0.2)', 
-                            line_color='rgba(255, 255, 255, 0)', 
-                            name='Fill')
+    ## Create trace for filling between lines
+    #fill_trace = go.Scatter(x = xvar + xvar[::-1], 
+                            #y = yvar1 + yvar2[::-1], 
+                            #fill='tozerox', 
+                            #fillcolor='rgba(0, 176, 246, 0.2)', 
+                            #line_color='rgba(255, 255, 255, 0)', 
+                            #name='Fill')
 
-    return fill_trace
+    fig.append_trace(trace1, 1, 1)  # plot in first row
+    fig.append_trace(trace2, 1, 1)  # plot in first row
+    return fig
 
 
 def dots_trace(df, xvar, yvar):
