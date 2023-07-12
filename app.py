@@ -26,7 +26,7 @@ app = dash.Dash(
 app.title = "NiChart"
 server = app.server
 PATH = pathlib.Path(__file__).parent
-DATA_PATH = PATH.joinpath("data").resolve()
+DATA_PATH = PATH.joinpath("data", "csv_data").resolve()
 
 #####################################################
 ## Hard coded parameters
@@ -161,7 +161,7 @@ def create_div_plot(curr_plot):
                             dcc.Checklist(
                                 id = curr_plot + "ref_data_layers",
                                 options=[
-                                    {"label": "Lin Reg", "value": "linreg_trace"},
+                                    {"label": "Percentiles", "value": "percentile_trace"},
                                     {"label": "Lowess Reg", "value": "lowess_trace"},
                                 ],
                                 value=[],

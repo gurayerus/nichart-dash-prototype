@@ -10,6 +10,32 @@ import numpy as np
 
 ####### Plot types ######
 
+
+def percentile_trace(df, xvar, yvar):
+    
+    #trace = go.Scatter(
+        #x=df[xvar], y=df[yvar], showlegend=False, mode = 'markers', name = "datapoint"
+    #)
+    ##return trace
+
+    yvar1 = 'centile_25'
+    yvar2 = 'centile_75'
+
+    # Create line traces
+    trace1 = go.Scatter(x=xvar, y=yvar1, mode='lines', name='Line 1')
+    trace2 = go.Scatter(x=xvar, y=yvar2, mode='lines', name='Line 2')
+
+    # Create trace for filling between lines
+    fill_trace = go.Scatter(x = xvar + xvar[::-1], 
+                            y=yvar1 + yvar2[::-1], 
+                            fill='tozerox', 
+                            fillcolor='rgba(0, 176, 246, 0.2)', 
+                            line_color='rgba(255, 255, 255, 0)', 
+                            name='Fill')
+
+    return fill_trace
+
+
 def dots_trace(df, xvar, yvar):
     trace = go.Scatter(
         x=df[xvar], y=df[yvar], showlegend=False, mode = 'markers', name = "datapoint"
