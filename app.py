@@ -37,12 +37,13 @@ NUM_PLOTS = 4
 ## Initial reference data files
 ##  csv files used as reference; users can upload additional ones
 dsets_ref = {
-    "Dset1": pd.read_csv(DATA_PATH2.joinpath("ISTAGING_Age_SelROIS_Centiles_ROI_601.csv")).to_dict('records'),
+    "ISTAG_CN": pd.read_csv(DATA_PATH2.joinpath("ISTAGING_Centiles_SelROIS.csv")).to_dict('records'),
 }
 
 ## Initial user data files
 ##  csv files with user data; normally users will upload them
 dsets_user = {
+    "Dset1": pd.read_csv(DATA_PATH1.joinpath("Dset1.csv"), index_col=0).to_dict('records'),
     "Dset2": pd.read_csv(DATA_PATH1.joinpath("Dset2.csv"), index_col=0).to_dict('records'),
     "Dset3": pd.read_csv(DATA_PATH1.joinpath("Dset3.csv"), index_col=0).to_dict('records'),
 }
@@ -109,7 +110,7 @@ def create_plot(dset_ref, dset_user, type_trace, type_refdatalayer, type_userdat
     ] = "The User is always right"  # Ensures zoom on graph is the same on update
     fig["layout"]["margin"] = {"t": 50, "l": 50, "b": 50, "r": 25}
     fig["layout"]["autosize"] = True
-    fig["layout"]["height"] = 600
+    fig["layout"]["height"] = 800
     fig["layout"]["xaxis"]["rangeslider"]["visible"] = False
     #fig["layout"]["xaxis"]["tickformat"] = "%H:%M"
     fig["layout"]["yaxis"]["showgrid"] = True
@@ -142,14 +143,16 @@ def create_div_plot(curr_plot):
                         children=["LayersData"],
                         style={"display": "none"},
                     ),
+
                     html.Span(
                         "Style",
                         id = curr_plot + "style_header",
                         className="span-menu",
                         n_clicks_timestamp=2,
                     ),
+
                     html.Span(
-                        "LayersRef",
+                        "Reference Layers",
                         id = curr_plot + "ref_data_layers_header",
                         className="span-menu",
                         n_clicks_timestamp=1,
@@ -170,7 +173,7 @@ def create_div_plot(curr_plot):
                         style={"display": "none"},
                     ),
                     html.Span(
-                        "LayersData",
+                        "Data Layers",
                         id = curr_plot + "user_data_layers_header",
                         className="span-menu",
                         n_clicks_timestamp=1,

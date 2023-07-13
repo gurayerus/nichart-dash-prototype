@@ -10,34 +10,36 @@ import numpy as np
 
 ####### Plot types ######
 
-
 def percentile_trace(df, xvar, yvar, fig):
     
+    cline = ['rgba(255, 255, 255, 0.8)', 'rgba(255, 225, 225, 0.8)', 
+             'rgba(255, 187, 187, 0.8)', 'rgba(255, 0, 0, 0.8)',
+             'rgba(255, 187, 187, 0.8)', 'rgba(255, 225, 225, 0.8)', 'rgba(255, 255, 255, 0.8)']
+
+    cfan = ['rgba(255, 225, 225, 0.2)', 'rgba(255, 225, 225, 0.3)', 
+            'rgba(255, 187, 187, 0.4)', 'rgba(255, 0, 0, 0.5)',
+            'rgba(255, 0, 0, 0.5)', 'rgba(255, 187, 187, 0.4)', 'rgba(255, 225, 225, 0.3)']
     
-    ### https://stackoverflow.com/questions/64741015/plotly-how-to-color-the-fill-between-two-lines-based-on-a-condition
-    
-    #trace = go.Scatter(
-        #x=df[xvar], y=df[yvar], showlegend=False, mode = 'markers', name = "datapoint"
-    #)
-    ##return trace
-
-
-    #print('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
-    #print(df.columns)
-
-    xvar = 'Age'
-
-    yvar1 = 'centile_25'
-    yvar2 = 'centile_75'
-
+    df_tmp = df[df.ROI == yvar]
+        
     # Create line traces
-    for i,cvar in enumerate(df.columns[1:]):
+    for i,cvar in enumerate(df.columns[2:]):
         if i == 0:
-            ctrace = go.Scatter(x = df[xvar], y = df[cvar], mode='lines', name='Line 1')
+            ctrace = go.Scatter(x = df_tmp[xvar], y = df_tmp[cvar], 
+                                mode='lines', name = cvar,
+                                line = dict(color = cline[i]))
         else:
-            ctrace = go.Scatter(x = df[xvar], y = df[cvar], mode='lines', name='Line 2', fill = 'tonexty')
+            ctrace = go.Scatter(x = df_tmp[xvar], y = df_tmp[cvar], 
+                                mode='lines', name = cvar, 
+                                line = dict(color = cline[i]),
+                                fill = 'tonexty',
+                                fillcolor = cfan[i])
 
         fig.append_trace(ctrace, 1, 1)  # plot in first row
+
+        #print('DDDDDDDDDDDDDDDDDDDDDDDD')
+        #print(cvar)
+        #input()
 
     ## Create trace for filling between lines
     #fill_trace = go.Scatter(x = xvar + xvar[::-1], 
@@ -50,7 +52,6 @@ def percentile_trace(df, xvar, yvar, fig):
     #fig.append_trace(trace1, 1, 1)  # plot in first row
     #fig.append_trace(trace2, 1, 1)  # plot in first row
     return fig
-
 
 def dots_trace(df, xvar, yvar):
     trace = go.Scatter(
