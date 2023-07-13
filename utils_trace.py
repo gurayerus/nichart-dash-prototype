@@ -31,8 +31,13 @@ def percentile_trace(df, xvar, yvar, fig):
     yvar2 = 'centile_75'
 
     # Create line traces
-    trace1 = go.Scatter(x = df[xvar], y = df[yvar1], mode='lines', name='Line 1')
-    trace2 = go.Scatter(x = df[xvar], y = df[yvar2], mode='lines', name='Line 2', fill = 'tonexty')
+    for i,cvar in enumerate(df.columns[1:]):
+        if i == 0:
+            ctrace = go.Scatter(x = df[xvar], y = df[cvar], mode='lines', name='Line 1')
+        else:
+            ctrace = go.Scatter(x = df[xvar], y = df[cvar], mode='lines', name='Line 2', fill = 'tonexty')
+
+        fig.append_trace(ctrace, 1, 1)  # plot in first row
 
     ## Create trace for filling between lines
     #fill_trace = go.Scatter(x = xvar + xvar[::-1], 
@@ -42,8 +47,8 @@ def percentile_trace(df, xvar, yvar, fig):
                             #line_color='rgba(255, 255, 255, 0)', 
                             #name='Fill')
 
-    fig.append_trace(trace1, 1, 1)  # plot in first row
-    fig.append_trace(trace2, 1, 1)  # plot in first row
+    #fig.append_trace(trace1, 1, 1)  # plot in first row
+    #fig.append_trace(trace2, 1, 1)  # plot in first row
     return fig
 
 
