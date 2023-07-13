@@ -16,9 +16,9 @@ def percentile_trace(df, xvar, yvar, fig):
              'rgba(255, 187, 187, 0.8)', 'rgba(255, 0, 0, 0.8)',
              'rgba(255, 187, 187, 0.8)', 'rgba(255, 225, 225, 0.8)', 'rgba(255, 255, 255, 0.8)']
 
-    cfan = ['rgba(255, 225, 225, 0.2)', 'rgba(255, 225, 225, 0.3)', 
-            'rgba(255, 187, 187, 0.4)', 'rgba(255, 0, 0, 0.5)',
-            'rgba(255, 0, 0, 0.5)', 'rgba(255, 187, 187, 0.4)', 'rgba(255, 225, 225, 0.3)']
+    cfan = ['rgba(255, 225, 225, 0.3)', 'rgba(255, 225, 225, 0.3)', 
+            'rgba(255, 187, 187, 0.3)', 'rgba(255, 0, 0, 0.3)',
+            'rgba(255, 0, 0, 0.3)', 'rgba(255, 187, 187, 0.3)', 'rgba(255, 225, 225, 0.3)']
     
     df_tmp = df[df.ROI == yvar]
         
@@ -37,25 +37,12 @@ def percentile_trace(df, xvar, yvar, fig):
 
         fig.append_trace(ctrace, 1, 1)  # plot in first row
 
-        #print('DDDDDDDDDDDDDDDDDDDDDDDD')
-        #print(cvar)
-        #input()
-
-    ## Create trace for filling between lines
-    #fill_trace = go.Scatter(x = xvar + xvar[::-1], 
-                            #y = yvar1 + yvar2[::-1], 
-                            #fill='tozerox', 
-                            #fillcolor='rgba(0, 176, 246, 0.2)', 
-                            #line_color='rgba(255, 255, 255, 0)', 
-                            #name='Fill')
-
-    #fig.append_trace(trace1, 1, 1)  # plot in first row
-    #fig.append_trace(trace2, 1, 1)  # plot in first row
     return fig
 
 def dots_trace(df, xvar, yvar):
     trace = go.Scatter(
-        x=df[xvar], y=df[yvar], showlegend=False, mode = 'markers', name = "datapoint"
+        x=df[xvar], y=df[yvar], showlegend=False, mode = 'markers', name = "datapoint",
+        line = dict(color = 'rgb(0,160,250)'),
     )
     return trace
 
@@ -64,7 +51,8 @@ def linreg_trace(df, xvar, yvar, fig):
                                    (np.array(df[yvar])))
     y_hat = model.predict(np.array(df[xvar]).reshape(-1,1))
     trace = go.Scatter(
-        x=df[xvar], y=y_hat, showlegend=False, mode = 'lines', name = "linregfit"
+        x=df[xvar], y=y_hat, showlegend=False, mode = 'lines', name = "linregfit",
+        line = dict(color = 'rgb(0,0,255)'),
     )
     fig.append_trace(trace, 1, 1)  # plot in first row
     return fig
@@ -75,7 +63,8 @@ def lowess_trace(df, xvar, yvar, fig):
     #y_hat = lowess(np.array(df[yvar], np.array(df[xvar], frac=1./3)
     y_hat = lowess(df[yvar], df[xvar], frac=1./3)
     trace = go.Scatter(
-        x = y_hat[:,0], y=y_hat[:,1], showlegend=False, mode = 'lines', name = "lowessfit"
+        x = y_hat[:,0], y=y_hat[:,1], showlegend=False, mode = 'lines', name = "lowessfit",
+        line = dict(color = 'rgb(0,255,0)'),        
     )
     fig.append_trace(trace, 1, 1)  # plot in first row
     return fig

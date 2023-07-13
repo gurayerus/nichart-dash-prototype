@@ -37,7 +37,7 @@ NUM_PLOTS = 4
 ## Initial reference data files
 ##  csv files used as reference; users can upload additional ones
 dsets_ref = {
-    "ISTAG_CN": pd.read_csv(DATA_PATH2.joinpath("ISTAGING_Centiles_SelROIS.csv")).to_dict('records'),
+    "ISTAG_CN": pd.read_csv(DATA_PATH2.joinpath("ISTAGING_Centiles_SelROIS_Init+Norm.csv")).to_dict('records'),
 }
 
 ## Initial user data files
@@ -94,12 +94,12 @@ def create_plot(dset_ref, dset_user, type_trace, type_refdatalayer, type_userdat
         vertical_spacing=0.12,
     )
 
-    # Add main trace (style) to figure
-    fig.append_trace(eval(type_trace)(dset_user, xvar, yvar), 1, 1)
-
     # Add ref layers 
     for sel_layer in sel_ref_data_layers:
         fig = eval(sel_layer)(dset_ref, xvar, yvar, fig)
+
+    # Add main trace (style) to figure
+    fig.append_trace(eval(type_trace)(dset_user, xvar, yvar), 1, 1)
 
     # Add user data layers 
     for sel_layer in sel_user_data_layers:
@@ -110,7 +110,7 @@ def create_plot(dset_ref, dset_user, type_trace, type_refdatalayer, type_userdat
     ] = "The User is always right"  # Ensures zoom on graph is the same on update
     fig["layout"]["margin"] = {"t": 50, "l": 50, "b": 50, "r": 25}
     fig["layout"]["autosize"] = True
-    fig["layout"]["height"] = 800
+    #fig["layout"]["height"] = 600
     fig["layout"]["xaxis"]["rangeslider"]["visible"] = False
     #fig["layout"]["xaxis"]["tickformat"] = "%H:%M"
     fig["layout"]["yaxis"]["showgrid"] = True
@@ -145,13 +145,6 @@ def create_div_plot(curr_plot):
                     ),
 
                     html.Span(
-                        "Style",
-                        id = curr_plot + "style_header",
-                        className="span-menu",
-                        n_clicks_timestamp=2,
-                    ),
-
-                    html.Span(
                         "Reference Layers",
                         id = curr_plot + "ref_data_layers_header",
                         className="span-menu",
@@ -165,7 +158,6 @@ def create_div_plot(curr_plot):
                                 id = curr_plot + "ref_data_layers",
                                 options=[
                                     {"label": "Percentiles", "value": "percentile_trace"},
-                                    {"label": "Lowess Reg", "value": "lowess_trace"},
                                 ],
                                 value=[],
                             )
@@ -534,13 +526,11 @@ def generate_open_close_menu_callback():
 # Function for hidden div that stores the last clicked menu tab
 # Also updates style and user_data_layers menu headers
 def generate_active_menu_tab_callback():
-    def update_current_tab_name(n_style, n_ref_data_layers, n_user_data_layers):
-        if n_style == np.max([n_style, n_ref_data_layers, n_user_data_layers]):
-            return "Style", "span-menu selected", "span-menu", "span-menu"
+    def update_current_tab_name(n_ref_data_layers, n_user_data_layers):
+        if n_ref_data_layers == np.max([n_ref_data_layers, n_user_data_layers]):
+            return "LayersRef", "span-menu selected","span-menu"
         else:
-            if n_ref_data_layers == np.max([n_style, n_ref_data_layers, n_user_data_layers]):
-                return "LayersRef", "span-menu", "span-menu selected","span-menu"
-        return "LayersData", "span-menu", "span-menu", "span-menu selected"
+            return "LayersData", "span-menu", "span-menu selected"
 
     return update_current_tab_name
 
@@ -738,12 +728,10 @@ for curr_plot in plot_names:
     app.callback(
         [
             Output(curr_plot + "menu_tab", "children"),
-            Output(curr_plot + "style_header", "className"),
             Output(curr_plot + "ref_data_layers_header", "className"),
             Output(curr_plot + "user_data_layers_header", "className"),
         ],
         [
-            Input(curr_plot + "style_header", "n_clicks_timestamp"),
             Input(curr_plot + "ref_data_layers_header", "n_clicks_timestamp"),
             Input(curr_plot + "user_data_layers_header", "n_clicks_timestamp"),
         ],
