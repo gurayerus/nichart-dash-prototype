@@ -371,7 +371,8 @@
 /* Custom App CSS
 ---------------------------------------*/
 body{
-    background-color: #f7f6f0;
+/*     background-color: #f7f6f0; */
+    background-color: #022e4a;
     color: #ffffff;
     height: 100vh;
     margin: 0;
@@ -479,9 +480,10 @@ div.Select-value, .Select-control,div.period, .Select-input{
 }
 
 .Select-control{
-  background-color: inherit;
-  color:#b4b4b4;
-  border-color: rgba(180, 180, 180, 0.4);
+/*   background-color: inherit; */
+  background-color: white;
+  color: #b4b4b4;
+  border-color: rgba(30, 30, 30, 0.7);
   border-radius: 20px 20px 20px 20px / 50% 50% 50% 50%;
 }
 
@@ -491,7 +493,9 @@ div.Select-value, .Select-control,div.period, .Select-input{
 }
 
 .has-value.Select--single>.Select-control .Select-value .Select-value-label, .has-value.is-pseudo-focused.Select--single>.Select-control .Select-value .Select-value-label{
-  color:#b4b4b4;
+  background-color: white;
+/*   color:#b4b4b4;  */
+  color:#000000;
 }
 
 .Select.is-open> .Select-control{
@@ -501,11 +505,15 @@ div.Select-value, .Select-control,div.period, .Select-input{
 
 .Select-menu-outer {
   margin-top: 7px;
-  background-color: #262a30;
+  background-color: white;
   border: 1px solid #b4b4b4;
   border-radius: 4px;
   z-index: 1000;
 }
+
+/*.Select-control {
+    background-color: black;
+}*/
 
 .visible{
   display: block;
@@ -530,16 +538,29 @@ div.Select-value, .Select-control,div.period, .Select-input{
 }
 
 .dropdown-roi{
+/*   border: 2px solid #ffffff; */
+  border: #eb345b
+  color: #ffffff;
+  width: 100px;
+  font-size: 10px;
+}
+
+.dropdown-roi{
+/*   border: 2px solid #ffffff; */
+  border: #000000;
+  color: #000000;
   width: 100px;
   font-size: 10px;
 }
 
 .chart-top-bar{
-  background-color: #30333d;
-  padding:12px;
+  background-color: #e1f0da;
+/*   background-color: #000000; */
+  padding:8px;
 }
 
 .chart-title{
+  color: black;
   margin-top: 3px;
   margin-left: 12px;
 }

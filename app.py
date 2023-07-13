@@ -109,13 +109,14 @@ def create_plot(dset_ref, dset_user, type_trace, type_refdatalayer, type_userdat
     ] = "The User is always right"  # Ensures zoom on graph is the same on update
     fig["layout"]["margin"] = {"t": 50, "l": 50, "b": 50, "r": 25}
     fig["layout"]["autosize"] = True
-    fig["layout"]["height"] = 400
+    fig["layout"]["height"] = 600
     fig["layout"]["xaxis"]["rangeslider"]["visible"] = False
     #fig["layout"]["xaxis"]["tickformat"] = "%H:%M"
     fig["layout"]["yaxis"]["showgrid"] = True
-    fig["layout"]["yaxis"]["gridcolor"] = "#3E3F40"
+    fig["layout"]["xaxis"]["gridcolor"] = "#ededeb"
+    fig["layout"]["yaxis"]["gridcolor"] = "#ededeb"
     fig["layout"]["yaxis"]["gridwidth"] = 1
-    fig["layout"].update(paper_bgcolor="#21252C", plot_bgcolor="#21252C")
+    fig["layout"].update(paper_bgcolor="#fafafa", plot_bgcolor="#fafafa")
 
     return fig
 
