@@ -371,8 +371,8 @@
 /* Custom App CSS
 ---------------------------------------*/
 body{
-    background-color: #1a1c23;
-    color: #b2b2b2;
+    background-color: #f7f6f0;
+    color: #ffffff;
     height: 100vh;
     margin: 0;
 }
@@ -386,17 +386,6 @@ body{
 .span-menu:hover, .selected{
   text-decoration: underline;
   text-decoration-color: #58e3e8;
-}
-
-.table-orders{
-  width: 100%;
-  background-color: #22252b;
-  color: #686868;
-/*   overflow-x: auto; */
-}
-
-.table-orders-empty{
-  padding: 24px;
 }
 
 tr{
@@ -433,40 +422,7 @@ th{
 }
 
 .div-right-panel{
-  padding: 80px 64px 64px 32px;
-}
-
-.div-bid-ask{
-  max-height: 45%;
-  padding-bottom: 15px;
-}
-
-.div-top-bar{
-  color: #ededed;
-  font-size: 18px;
-}
-
-.div-info{
-  padding: 32px;
-}
-
-.div-info p{
-  font-size: 12px;
-}
-
-.div-bottom-panel{
-  margin: 24px 0px 0px 0px;
-  padding: 5;
-  height: 21%;
-  background-color: #282b33;
-}
-
-.div-close-orders{
-  float: right;
-  right: 5px;
-  top: 3px;
-  width: 200px;
-  text-align: center;
+  padding: 2px 2px 2px 2px;
 }
 
 .title-header{
@@ -488,28 +444,10 @@ th{
 .chart-style{
   position: relative;
   float: left;
-  padding-right: 12px;
+  padding-right: 2px;
   margin-left: 0px;
 }
 
-.height-50{
-  height: 50%;
-}
-
-.height-100{
-  height: 100%;
-}
-
-.p-top-bar{
-  color: #b2b2b2;
-  font-size: 18px;
-}
-
-.header-bid-ask{
-  text-align: center;
-  padding-left: 10px;
-  color: #ededed;
-}
 .three-col{
   display: inline-block;
   width: 33%;
@@ -527,14 +465,11 @@ th{
   max-width: 200px;
 }
 
-
-
 button{
   color: #EDEDED;
   margin: 0px;
   border-radius: 0px;
 }
-
 
 div.Select-value, .Select-control,div.period, .Select-input{
   padding:0px;
@@ -548,14 +483,6 @@ div.Select-value, .Select-control,div.period, .Select-input{
   color:#b4b4b4;
   border-color: rgba(180, 180, 180, 0.4);
   border-radius: 20px 20px 20px 20px / 50% 50% 50% 50%;
-}
-
-.no-profit{
-  background: linear-gradient(to bottom, rgba(255,0,0,0), rgba(255,0,0,1));
-}
-
-.profit{
-  background: linear-gradient(to bottom, rgba(0,255,0,0), rgba(0,255,0,1));
 }
 
 .Select-value-label{
@@ -641,6 +568,10 @@ div.Select-value, .Select-control,div.period, .Select-input{
   float: right;
 }
 
+.graph-top-center{
+  float: center;
+}
+
 .graph-top-bar{
   display: inline-block;
 }
@@ -654,6 +585,21 @@ div.Select-value, .Select-control,div.period, .Select-input{
   padding-left:21px;
 }
 
+.button-plot {
+    margin-top: 20px;
+    margin-bottom: 20px;
+    margin-left: 5px;
+    margin-right: 5px;
+    background-color:#606ceb;
+    color: #fff;
+    border:none;
+}
+  
+.button-plot:hover {
+      background-color:#002ead;
+      transition: 0.7s;
+}
+  
 .button-buy-sell-chart{
   width: 48%;
   text-align: center;

@@ -60,9 +60,7 @@ plot_names = ["Plot" + str(i+1) for i in range(NUM_PLOTS)]
 #####################################################
 ## Functions to create different parts of the dashboard
 
-def create_plot(dset_ref, dset_user, 
-                type_trace, type_refdatalayer, type_userdatalayer, 
-                xvar, yvar):
+def create_plot(dset_ref, dset_user, type_trace, type_refdatalayer, type_userdatalayer, xvar, yvar):
     ''' Create a figure for a single plot (generated using user selections)
     '''
 
@@ -301,7 +299,7 @@ app.layout = html.Div(
 
         # Left Panel Div
         html.Div(
-            className="three columns div-left-panel",
+            className="one columns div-left-panel",
             children=[
 
                 # Div for Left Panel App Info
@@ -319,21 +317,20 @@ app.layout = html.Div(
                     ],
                 ),
 
-                # Div for uploading reference data file(s)
+                # Div for uploading dataset
                 html.Div([
-                    html.Div('Upload reference data file(s) (csv): ', 
-                             style={'color': 'yellow', 'fontSize': 14}),
+                    html.Div('Upload dataset: ', 
+                             style={'color': 'white', 'fontSize': 16, 'padding-top': 20, 'padding-bottom': 10}),
                     dcc.Upload(
-                        id='upload_data_ref',
+                        id='upload_data_user',
                         children=html.Div([
-                            'Drag and Drop or ',
                             html.A('Select Files')
                         ]),
                         style={
-                            'width': '100%',
-                            'height': '60px',
-                            'lineHeight': '60px',
-                            'borderWidth': '1px',
+                            'width': '80%',
+                            'height': '90px',
+                            'lineHeight': '90px',
+                            'borderWidth': '2px',
                             'borderStyle': 'dashed',
                             'borderRadius': '5px',
                             'textAlign': 'center',
@@ -345,21 +342,41 @@ app.layout = html.Div(
                     dcc.Store(id = 'store_data_ref', data = dsets_ref),
                 ]),
 
-                # Div for uploading user data file(s)
+                # Div for selecting dataset
                 html.Div([
-                    html.Div('Upload user data file(s) (csv): ', 
-                             style={'color': 'yellow', 'fontSize': 14}),
+                    html.Div('Active dataset: ', style={'color': 'white', 'fontSize': 16, 'padding-top': 20, 'padding-bottom': 10}),
+
+                    # Dropdown file list
+                    html.Div(
+                        className="inline-block",
+                        children=[
+                            dcc.Dropdown(
+                                className="dropdown-roi",
+                                id = "dropdown_data_user",
+                                options=[
+                                    {'label': i, 'value': i} for i in list(dsets_user.keys())
+                                ],
+                                value = list(dsets_user.keys())[0],
+                                clearable=False,
+                            )
+                        ],
+                    ),
+                ]),
+                                        
+                # Div for uploading ref file(s)
+                html.Div([
+                    html.Div('Upload reference: ', 
+                             style={'color': 'orange', 'fontSize': 16, 'padding-top': 20, 'padding-bottom': 10}),
                     dcc.Upload(
-                        id='upload_data_user',
+                        id='upload_data_ref',
                         children=html.Div([
-                            'Drag and Drop or ',
                             html.A('Select Files')
                         ]),
                         style={
-                            'width': '100%',
-                            'height': '60px',
-                            'lineHeight': '60px',
-                            'borderWidth': '1px',
+                            'width': '80%',
+                            'height': '90px',
+                            'lineHeight': '90px',
+                            'borderWidth': '2px',
                             'borderStyle': 'dashed',
                             'borderRadius': '5px',
                             'textAlign': 'center',
@@ -371,85 +388,48 @@ app.layout = html.Div(
                     dcc.Store(id = 'store_data_user', data = dsets_user),
                 ]),
 
-                # Div for showing ref data files info
+                # Div for selecting reference
                 html.Div([
-                    html.Div('Reference data info: ', style={'color': 'red', 'fontSize': 14}),
+                    html.Div('Active reference: ', style={'color': 'white', 'fontSize': 16, 'padding-top': 20, 'padding-bottom': 10}),
 
                     # Dropdown file list
                     html.Div(
-                        className="graph-top-right inline-block",
+                        className="inline-block",
                         children=[
-                            html.Div(
-                                className="inline-block",
-                                children=[
-                                    dcc.Dropdown(
-                                        className="dropdown-roi",
-                                        id = "dropdown_data_ref",
-                                        options=[
-                                            {'label': i, 'value': i} for i in list(dsets_ref.keys())
-                                        ],
-                                        value = list(dsets_ref.keys())[0],
-                                        clearable=False,
-                                    )
+                            dcc.Dropdown(
+                                className="dropdown-roi",
+                                id = "dropdown_data_ref",
+                                options=[
+                                    {'label': i, 'value': i} for i in list(dsets_user.keys())
                                 ],
-                            ),
+                                value = list(dsets_ref.keys())[0],
+                                clearable=False,
+                            )
                         ],
                     ),
-                                        
-                    ### FIXME
-                    dcc.Textarea(value = 'TODO: Add here info about selected ref df', 
-                                 className='my-class', 
-                                 id='text_ref_df'
-                                ),
-                ]),
-                                        
-                # Div for showing user data files info
-                html.Div([
-                    html.Div('User data info: ', style={'color': 'red', 'fontSize': 14}),
-
-                    # Dropdown file list
-                    html.Div(
-                        className="graph-top-right inline-block",
-                        children=[
-                            html.Div(
-                                className="inline-block",
-                                children=[
-                                    dcc.Dropdown(
-                                        className="dropdown-roi",
-                                        id = "dropdown_data_user",
-                                        options=[
-                                            {'label': i, 'value': i} for i in list(dsets_user.keys())
-                                        ],
-                                        value = list(dsets_user.keys())[0],
-                                        clearable=False,
-                                    )
-                                ],
-                            ),
-                        ],
-                    ),
-                                        
-                    ### FIXME
-                    dcc.Textarea(value = 'TODO: Add here info about selected user df', 
-                                 className='my-class', 
-                                 id='text_user_df'
-                                ),
                 ]),
                  
                 # Div for new plot button
-                html.Div([
-                    html.Button(
-                        id = "new_plot_button",
-                        children = "New Plot",
-                        n_clicks = 0,
+                html.Div(
+                    html.Div(
+                        className="inline-block float-center",
+                        children=[
+                            html.Div(
+                                #className="graph-top-right inline-block",
+                                className="button-plot",
+                                children=[
+                                    html.Button(id = "new_plot_button", children = "New Plot", n_clicks = 0)
+                                ]
+                            )
+                        ]
                     )
-                ]),
-            ],
-                    
+                ),
+            ]
         ),
 
         # Right Panel Div with plots
         html.Div(
-            className="nine columns div-right-panel",
+            className="eleven columns div-right-panel",
             children=[
 
                 # Charts Div
