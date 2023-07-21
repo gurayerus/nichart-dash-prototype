@@ -34,24 +34,39 @@ DATA_PATH2 = PATH.joinpath("data", "reference_data", 'CENTILES').resolve()
 ## FIXME : this part will be modified in final version
 NUM_PLOTS = 4
 
+### Initial reference data files
+###  csv files used as reference; users can upload additional ones
+#dsets_ref = {
+    #"ISTAG_CN0": pd.read_csv(DATA_PATH2.joinpath("ISTAGING_Centiles_CN_All.csv")).to_dict('records'),
+    #"ISTAG_CN": pd.read_csv(DATA_PATH2.joinpath("ISTAGING_Centiles_SelROIS_Init+Norm.csv")).to_dict('records'),
+#}
+
+### Initial user data files
+###  csv files with user data; normally users will upload them
+#dsets_user = {
+    #"Dset1": pd.read_csv(DATA_PATH1.joinpath("Dset1.csv"), index_col=0).to_dict('records'),
+    #"Dset2": pd.read_csv(DATA_PATH1.joinpath("Dset2.csv"), index_col=0).to_dict('records'),
+    #"Dset3": pd.read_csv(DATA_PATH1.joinpath("Dset3.csv"), index_col=0).to_dict('records'),
+    #"Dset4": pd.read_csv(DATA_PATH1.joinpath("Dset_SPAREBA.csv"), index_col=0).to_dict('records'),
+#}
+
 ## Initial reference data files
 ##  csv files used as reference; users can upload additional ones
 dsets_ref = {
-    "ISTAG_CN": pd.read_csv(DATA_PATH2.joinpath("ISTAGING_Centiles_SelROIS_Init+Norm.csv")).to_dict('records'),
+    "ISTAG_CN0": pd.read_csv(DATA_PATH2.joinpath("ISTAGING_Centiles_CN_All.csv")).to_dict('records'),
 }
 
 ## Initial user data files
 ##  csv files with user data; normally users will upload them
 dsets_user = {
-    "Dset1": pd.read_csv(DATA_PATH1.joinpath("Dset1.csv"), index_col=0).to_dict('records'),
-    "Dset2": pd.read_csv(DATA_PATH1.joinpath("Dset2.csv"), index_col=0).to_dict('records'),
-    "Dset3": pd.read_csv(DATA_PATH1.joinpath("Dset3.csv"), index_col=0).to_dict('records'),
+    "Dset4": pd.read_csv(DATA_PATH1.joinpath("Dset_SPAREBA.csv"), index_col=0).to_dict('records'),
 }
+
 
 ## Get ROI names
 tmp_col = pd.DataFrame.from_dict(list(dsets_user.values())[0]).columns
-ROI_NAMES = tmp_col[tmp_col.str.contains('MUSE')].tolist()
-NON_ROI_COLS = tmp_col[tmp_col.str.contains('MUSE') == False].tolist()
+ROI_NAMES = tmp_col[tmp_col.str.contains('MUSE')].tolist() + tmp_col[tmp_col.str.contains('SPARE')].tolist()
+NON_ROI_COLS = ['Age']
 
 #####################################################
 
@@ -502,6 +517,13 @@ def generate_figure_callback(curr_plot):
         
         if curr_ref_dset is None:
             return {"layout": {}, "data": {}}
+
+
+        print('AAAAAAAAAAAAAA')
+        print(sel_xvar)
+        print(sel_yvar)
+        print(curr_user_dset.head())
+        
 
         fig = create_plot(curr_ref_dset, curr_user_dset, 
                           plot_type, ref_data_layers, user_data_layers, 
