@@ -26,8 +26,8 @@ app = dash.Dash(
 app.title = "NiChart"
 server = app.server
 PATH = pathlib.Path(__file__).parent
-DATA_PATH1 = PATH.joinpath("data", "csv_data").resolve()
-DATA_PATH2 = PATH.joinpath("data", "reference_data", 'CENTILES').resolve()
+DATA_PATH1 = PATH.joinpath("data", "csv_data_Randa").resolve()
+DATA_PATH2 = PATH.joinpath("data", "reference_data", 'CENTILES_Randa').resolve()
 
 #####################################################
 ## Hard coded parameters
@@ -50,35 +50,17 @@ NUM_PLOTS = 4
     #"Dset4": pd.read_csv(DATA_PATH1.joinpath("Dset_SPAREBA.csv"), index_col=0).to_dict('records'),
 #}
 
-
-
-### Initial reference data files
-###  csv files used as reference; users can upload additional ones
-#dsets_ref = {
-    #"ISTAG_CN0": pd.read_csv(DATA_PATH2.joinpath("ISTAGING_Centiles_CN_All.csv")).to_dict('records'),
-#}
-
-### Initial user data files
-###  csv files with user data; normally users will upload them
-#dsets_user = {
-    #"Dset4": pd.read_csv(DATA_PATH1.joinpath("Dset_SPAREBA.csv"), index_col=0).to_dict('records'),
-#}
-
-
 ## Initial reference data files
 ##  csv files used as reference; users can upload additional ones
 dsets_ref = {
-    "ISTAG_CN0": pd.read_csv(DATA_PATH2.joinpath("ISTAGING_Centiles_SelROIS_Init+Norm.csv")).to_dict('records'),
-    "ISTAG_AD+CN-CN": pd.read_csv(DATA_PATH2.joinpath("ISTAGING_CN+AD-CN_Centiles_SelROIS_All.csv")).to_dict('records'),
-    "ISTAG_AD+CN-AD": pd.read_csv(DATA_PATH2.joinpath("ISTAGING_CN+AD-AD_Centiles_SelROIS_All.csv")).to_dict('records'),
+    "ISTAG_CN0": pd.read_csv(DATA_PATH2.joinpath("istaging_reduced_age_dist_centiles.csv")).to_dict('records'),
 }
+
 ## Initial user data files
 ##  csv files with user data; normally users will upload them
 dsets_user = {
-    "Dset1": pd.read_csv(DATA_PATH1.joinpath("Dset1.csv"), index_col=0).to_dict('records'),
-    "Dset2": pd.read_csv(DATA_PATH1.joinpath("Dset2.csv"), index_col=0).to_dict('records'),
+    "Dset1": pd.read_csv(DATA_PATH1.joinpath("tmp_roi.csv"), index_col=0).to_dict('records'),
 }
-
 
 
 ## Get ROI names
